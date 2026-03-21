@@ -30,7 +30,7 @@ export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // 🔹 Define routes properly (clean separation)
-  const isAuthRoute =
+  const publicRoute =
     pathname.startsWith("/login") || pathname.startsWith("/register");
 
   const isProtectedRoute = pathname.startsWith("/dashboard");
@@ -41,14 +41,33 @@ export async function proxy(req: NextRequest) {
   }
 
   // 🚫 Prevent logged-in users from auth pages
-  if (user && isAuthRoute) {
+  if (user && publicRoute) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  // Logged in + protected route → check profile
+  if (user && isProtectedRoute && pathname !== "/onboarding") {
+    const { data: profile } = await supabase
+      .from("student_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile) {
+      return NextResponse.redirect(new URL("/onboarding", req.url));
+    }
   }
 
   return res;
 }
 
 // middleware only run on this routes
+// export const config = {
+//   matcher: ["/dashboard/:path*", "/login", "/register"],
+// };
+
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/register"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
