@@ -1,71 +1,79 @@
 "use client";
 
-import axios from "axios";
-import React, { useEffect } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { login } from "@/server/auth/login";
+import { toast } from "react-hot-toast";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const [user, setUser] = React.useState({
-    email: "",
-    password: "",
-  });
-  const [error, setError] = React.useState("");
-  const [buttonDisabled, setButtonDisabled] = React.useState(true);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const login = async () => {
+  async function handleLogin(e: React.SubmitEvent) {
+    e.preventDefault();
+    setIsPending(true);
+
     try {
-      setIsLoading(true);
-      const res = await axios.post("/api/user/login", user);
-      console.log("login success", res.data);
-      // toast.success("Login Success");
-      router.push("/profile");
-    } catch (err: any) {
-      console.log("login error", err.message);
-      // toast.error(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const res = await login(email, password);
 
-  useEffect(() => {
-    if (user.email.length > 0 && user.password.length > 0) {
-      setButtonDisabled(false);
+      if (res?.error) {
+        toast.error(res.error);
+        return;
+      }
+
+      toast.success("Login successful 🚀");
+      router.push("/dashboard");
+    } catch {
+      toast.error("Something went wrong");
+    } finally {
+      setIsPending(false);
     }
-  }, [user]);
+  }
 
   return (
-    <div>
-      <h1>Login Page {isLoading ? "Processing" : ""}</h1>
-      <br />
-      <label htmlFor="email">email</label>
-      <input
-        type="text"
-        id="email"
-        placeholder="Enter your email"
-        value={user.email}
-        onChange={(e) => {
-          setUser({ ...user, email: e.target.value });
-        }}
-      />
-      <br />
-      <label htmlFor="password">Password</label>
-      <input
-        type="password"
-        id="password"
-        placeholder="Enter your password"
-        value={user.password}
-        onChange={(e) => setUser({ ...user, password: e.target.value })}
-      />
-      <br />
-      <button type="submit" onClick={login}>
-        {buttonDisabled ? "Disabled" : "Login"}
-      </button>
-      <br />
-      <Link href="/signup">Visit Signup</Link>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-zinc-900 to-zinc-800 px-4">
+      <Card className="w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl transition-all duration-300 hover:scale-[1.01]">
+        <CardContent className="p-8">
+          <h1 className="text-2xl font-semibold text-white mb-6 text-center">
+            Welcome Back
+          </h1>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="bg-white/10 border-none text-white placeholder:text-gray-400 focus:ring-2 focus:ring-white/20"
+              required
+            />
+
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="bg-white/10 border-none text-white placeholder:text-gray-400 focus:ring-2 focus:ring-white/20"
+              required
+            />
+
+            <Button
+              type="submit"
+              disabled={isPending}
+              className="w-full bg-white text-black hover:bg-gray-200 transition-all duration-200"
+            >
+              {isPending ? "Logging in..." : "Login"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
