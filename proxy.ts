@@ -33,7 +33,7 @@ export async function proxy(req: NextRequest) {
   const publicRoute =
     pathname.startsWith("/login") || pathname.startsWith("/register");
 
-  const isProtectedRoute = pathname.startsWith("/dashboard");
+  const isProtectedRoute = pathname.startsWith("/calendar-dashboard");
 
   // 🔒 Protect private routes
   if (!user && isProtectedRoute) {
@@ -42,7 +42,7 @@ export async function proxy(req: NextRequest) {
 
   // 🚫 Prevent logged-in users from auth pages
   if (user && publicRoute) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+    return NextResponse.redirect(new URL("/calendar-dashboard", req.url));
   }
 
   // Logged in + protected route → check profile

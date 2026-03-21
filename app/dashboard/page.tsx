@@ -1,12 +1,38 @@
-"use clientssss";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-white">
-      <div className="bg-white/10 p-6 rounded-xl border border-white/20 w-full max-w-md">
-        <h1 className="text-xl font-semibold mb-4">Dev Dashboard</h1>
+  const supabase = createClient();
 
-        <p className="text-sm text-gray-300 mb-2">You are logged in ✅</p>
+  // 1. Get user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return <div>Unauthorized</div>;
+  }
+
+  // 2. Get student profile
+  const { data: profile } = await supabase
+    .from("student_profiles")
+    .select(
+      `
+      id,
+      session_id,
+      program_id,
+      semester_id
+    `,
+    )
+    .eq("user_id", user.id)
+    .single();
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
+
+      <div className="mt-4">
+        <p>User ID: {user.id}</p>
+        <p>Profile ID: {profile?.id}</p>
       </div>
     </div>
   );

@@ -29,7 +29,8 @@ export default function LoginPage() {
       }
 
       toast.success("Login successful 🚀");
-      router.push("/dashboard");
+      // router.push("/dashboard");
+      router.push("/calendar-dashboard");
     } catch {
       toast.error("Something went wrong");
     } finally {
