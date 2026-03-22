@@ -107,7 +107,7 @@ function ProjectionTab({ projections }: { projections: SemesterProjection[] }) {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               {/* Trend arrow */}
               <span
-                className={`text-base flex-shrink-0 ${
+                className={`text-base shrink-0 ${
                   p.trend === "improving"
                     ? "text-green-500"
                     : p.trend === "declining"
@@ -126,7 +126,7 @@ function ProjectionTab({ projections }: { projections: SemesterProjection[] }) {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+            <div className="flex items-center gap-2 shrink-0 ml-4">
               <span className="text-xs text-muted-foreground">
                 {p.currentPercentage}% now
               </span>
@@ -247,7 +247,7 @@ function TrendGroup({
               {s.subjectName}
             </span>
             {/* Mini sparkline */}
-            <div className="flex items-end gap-0.5 h-5 flex-shrink-0">
+            <div className="flex items-end gap-0.5 h-5 shrink-0">
               {s.weeklyTrend.map((w, i) => {
                 const h = Math.max(2, (w.attendancePercentage / 100) * 20);
                 return (
@@ -266,7 +266,7 @@ function TrendGroup({
               })}
             </div>
             <span
-              className={`text-xs font-semibold w-8 text-right flex-shrink-0 ${
+              className={`text-xs font-semibold w-8 text-right shrink-0 ${
                 s.riskLevel === "safe"
                   ? "text-green-600 dark:text-green-400"
                   : s.riskLevel === "warning"
@@ -312,7 +312,7 @@ function RecoveryTab({ subjects }: { subjects: SubjectAnalytics[] }) {
             </p>
           </div>
           <div
-            className={`text-right ml-4 flex-shrink-0 ${
+            className={`text-right ml-4 shrink-0 ${
               s.riskLevel === "danger"
                 ? "text-red-600 dark:text-red-400"
                 : "text-yellow-600 dark:text-yellow-400"

@@ -73,7 +73,7 @@ export default function OnboardingPage() {
       }
 
       toast.success("Profile created successfully");
-      router.push("/dashboard");
+      router.push("/calendar-dashboard");
     } catch {
       toast.error("Something went wrong");
     } finally {

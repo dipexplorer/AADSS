@@ -182,7 +182,7 @@ export default function SemesterStatisticsClient({
         <div className="bg-card/50 border border-border/50 rounded-xl p-5">
           <div className="flex items-start gap-3">
             <svg
-              className="w-4 h-4 text-primary flex-shrink-0 mt-0.5"
+              className="w-4 h-4 text-primary shrink-0 mt-0.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

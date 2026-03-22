@@ -46,7 +46,7 @@ export default function SubjectCard({ subject }: Props) {
             {subject.subjectName}
           </h3>
           <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${config.bg} ${config.text}`}
+            className={`text-xs font-bold px-2.5 py-1 rounded-full hrink-0 ${config.bg} ${config.text}`}
           >
             {config.label}
           </span>
@@ -121,7 +121,7 @@ export default function SubjectCard({ subject }: Props) {
             }`}
           >
             <svg
-              className="w-4 h-4 mt-0.5 flex-shrink-0"
+              className="w-4 h-4 mt-0.5 shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
