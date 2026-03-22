@@ -14,6 +14,7 @@ import {
 import { toast } from "react-hot-toast";
 import DateNavigator from "@/app/daily-attendance/components/DateNavigator";
 import ScheduleTimeline from "@/app/daily-attendance/components/ScheduleTimeline";
+import type { GeoLocation } from "@/lib/engines/validation/types";
 
 interface Profile {
   id: string;
@@ -93,9 +94,49 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
             );
           }
         } else {
-          const { error } = await markAttendance(sessionId, profile.id, status);
-          if (error) {
-            toast.error(error);
+          // Fetch geolocation if marking as present
+          let userLocation: GeoLocation | undefined;
+          if (status === "present") {
+            try {
+              userLocation = await new Promise<GeoLocation>((resolve, reject) => {
+                if (!navigator.geolocation) {
+                  return reject(new Error("Geolocation not supported"));
+                }
+                navigator.geolocation.getCurrentPosition(
+                  (pos) =>
+                    resolve({
+                      latitude: pos.coords.latitude,
+                      longitude: pos.coords.longitude,
+                      accuracy: pos.coords.accuracy,
+                    }),
+                  (err) => reject(err),
+                  { enableHighAccuracy: true, timeout: 10000 },
+                );
+              });
+            } catch (err) {
+              const errorMessage =
+                err instanceof Error ? err.message : "Location access denied";
+              toast.error(`Location required for attendance: ${errorMessage}`);
+              // Revert optimistic update
+              setPeriods((prev) =>
+                prev.map((p) =>
+                  p.sessionId === sessionId
+                    ? { ...p, attendanceStatus: null }
+                    : p,
+                ),
+              );
+              return;
+            }
+          }
+
+          const result = await markAttendance(
+            sessionId,
+            profile.id,
+            status,
+            userLocation,
+          );
+          if (result.error) {
+            toast.error(result.error);
             // Revert
             setPeriods((prev) =>
               prev.map((p) =>

@@ -2,6 +2,8 @@
 "use client";
 
 import { ClassPeriod } from "@/lib/attendance/getDailySchedule";
+import type { GeoLocation } from "@/lib/engines/validation/types";
+import { useState } from "react";
 
 interface ScheduleTimelineProps {
   periods: ClassPeriod[];
@@ -117,10 +119,36 @@ function PeriodCard({
   onStatusChange: (
     sessionId: string,
     status: "present" | "absent" | "cancelled" | null,
+    location?: GeoLocation,
   ) => void;
 }) {
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
   const status = period.attendanceStatus;
   const isCancelled = period.status === "cancelled";
+
+  async function handlePresentClick() {
+    if (status === "present") {
+      onStatusChange(period.sessionId, null);
+      return;
+    }
+
+    setLocationError(null);
+    setLocating(true);
+
+    try {
+      const geoLocation = await getCurrentLocation();
+      onStatusChange(period.sessionId, "present", geoLocation);
+    } catch (err: any) {
+      // Location denied ya unavailable — try without location
+      // Server side pe timetable mein coordinates check hoga
+      console.warn("Location unavailable:", err.message);
+      onStatusChange(period.sessionId, "present", undefined);
+    } finally {
+      setLocating(false);
+    }
+  }
 
   const borderColor =
     status === "present"
@@ -193,6 +221,10 @@ function PeriodCard({
               </span>
             )}
           </div>
+          {/* Location error message */}
+          {locationError && (
+            <p className="text-xs text-red-500 mt-1">{locationError}</p>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -204,32 +236,50 @@ function PeriodCard({
           <div className="flex items-center gap-2 shrink-0">
             {/* Present */}
             <button
-              onClick={() =>
-                onStatusChange(
-                  period.sessionId,
-                  status === "present" ? null : "present",
-                )
-              }
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
+              onClick={handlePresentClick}
+              disabled={locating}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 disabled:opacity-60 ${
                 status === "present"
                   ? "bg-green-600 text-white shadow-sm ring-2 ring-green-500 ring-offset-2 ring-offset-card"
                   : "text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30"
               }`}
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Present
+              {locating ? (
+                <svg
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              )}
+              {locating ? "Locating..." : "Present"}
             </button>
 
             {/* Absent */}
@@ -296,4 +346,32 @@ function PeriodCard({
       </div>
     </div>
   );
+}
+
+// Helper — browser se location maango
+function getCurrentLocation(): Promise<GeoLocation> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation not supported"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      (err) => {
+        reject(new Error(err.message));
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      },
+    );
+  });
 }
