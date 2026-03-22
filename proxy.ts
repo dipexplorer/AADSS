@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 export async function proxy(req: NextRequest) {
   const res = NextResponse.next();
 
-  // 🔹 Create Supabase client (handles cookies + session refresh)
+  // Create Supabase client (handles cookies + session refresh)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -20,7 +20,7 @@ export async function proxy(req: NextRequest) {
     },
   );
 
-  // 🔹 This line does EVERYTHING:
+  // This line does EVERYTHING:
   // - checks login
   // - refreshes session if expired
   const {
@@ -29,24 +29,25 @@ export async function proxy(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  // 🔹 Define routes properly (clean separation)
-  const publicRoute =
-    pathname.startsWith("/login") || pathname.startsWith("/register");
+  // Define routes properly (clean separation)
+  // Public routes — login nahi chahiye
+  const publicRoutes = ["/", "/login", "/register", "/verify-email"];
+  const isPublicRoute = publicRoutes.includes(pathname);
 
-  const isProtectedRoute = pathname.startsWith("/calendar-dashboard");
-
-  // 🔒 Protect private routes
-  if (!user && isProtectedRoute) {
+  // Protect private routes
+  if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // 🚫 Prevent logged-in users from auth pages
-  if (user && publicRoute) {
+  // Prevent logged-in users from auth pages
+  // Logged in + public route → calendar dashboard
+
+  if (user && isPublicRoute && pathname !== "/") {
     return NextResponse.redirect(new URL("/calendar-dashboard", req.url));
   }
 
   // Logged in + protected route → check profile
-  if (user && isProtectedRoute && pathname !== "/onboarding") {
+  if (user && !isPublicRoute && pathname !== "/onboarding") {
     const { data: profile } = await supabase
       .from("student_profiles")
       .select("id")

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStudentProfile } from "@/lib/attendance/getStudentProfile";
 import CalendarDashboardInteractive from "@/app/calendar-dashboard/components/CalendarDashboardInteractive";
+import Header from "@/components/common/Header";
 
 export default async function CalendarDashboardPage() {
   const supabase = createClient();
@@ -16,5 +17,10 @@ export default async function CalendarDashboardPage() {
 
   if (!profile) redirect("/onboarding");
 
-  return <CalendarDashboardInteractive profile={profile as any} />;
+  return (
+    <>
+      <Header />
+      <CalendarDashboardInteractive profile={profile as any} />
+    </>
+  );
 }

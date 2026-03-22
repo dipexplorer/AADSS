@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getStudentProfile } from "@/lib/attendance/getStudentProfile";
 import { getSemesterStats } from "@/lib/attendance/getSemesterStats";
 import SemesterStatisticsClient from "./components/SemesterStatisticsClient";
+import Header from "@/components/common/Header";
 
 export const metadata = {
   title: "Semester Statistics - Acadence",
@@ -26,12 +27,15 @@ export default async function SemesterStatisticsPage() {
   );
 
   return (
-    <SemesterStatisticsClient
-      stats={stats}
-      error={error}
-      programName={(profile.programs as any)?.name ?? ""}
-      semesterNumber={(profile.semesters as any)?.semester_number ?? ""}
-      sessionName={(profile.academic_sessions as any)?.name ?? ""}
-    />
+    <>
+      <Header />
+      <SemesterStatisticsClient
+        stats={stats}
+        error={error}
+        programName={(profile.programs as any)?.name ?? ""}
+        semesterNumber={(profile.semesters as any)?.semester_number ?? ""}
+        sessionName={(profile.academic_sessions as any)?.name ?? ""}
+      />
+    </>
   );
 }

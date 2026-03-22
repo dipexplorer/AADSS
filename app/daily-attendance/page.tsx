@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getStudentProfile } from "@/lib/attendance/getStudentProfile";
 import { Suspense } from "react";
 import DailyAttendanceClient from "@/app/daily-attendance/components/DailyAttendanceClient";
+import Header from "@/components/common/Header";
 
 export default async function DailyAttendancePage({
   searchParams,
@@ -26,9 +27,12 @@ export default async function DailyAttendancePage({
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   return (
-    <Suspense fallback={<DailyAttendanceSkeleton />}>
-      <DailyAttendanceClient profile={profile} initialDate={dateStr} />
-    </Suspense>
+    <>
+      <Header />
+      <Suspense fallback={<DailyAttendanceSkeleton />}>
+        <DailyAttendanceClient profile={profile} initialDate={dateStr} />
+      </Suspense>
+    </>
   );
 }
 
