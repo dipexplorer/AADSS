@@ -2,67 +2,62 @@
 "use client";
 
 import { useState } from "react";
-import { SubjectStat } from "@/lib/attendance/getSemesterStats";
+import type { SubjectAnalytics } from "@/lib/engines/analytics/types";
 
 interface Props {
-  subject: SubjectStat;
+  subject: SubjectAnalytics;
 }
 
 export default function SubjectCard({ subject }: Props) {
   const [expanded, setExpanded] = useState(false);
 
-  const isSafe = subject.status === "safe";
-  const isWarning = subject.status === "warning";
-  const isDanger = subject.status === "danger";
-
-  const statusConfig = {
+  const config = {
     safe: {
       bar: "bg-green-500",
-      text: "text-green-600",
+      text: "text-green-600 dark:text-green-400",
       bg: "bg-green-50 dark:bg-green-950/20",
-      border: "bg-green-500",
-      label: "Safe Zone",
+      topBar: "bg-green-500",
+      label: "Safe",
     },
     warning: {
       bar: "bg-yellow-500",
-      text: "text-yellow-600",
+      text: "text-yellow-600 dark:text-yellow-400",
       bg: "bg-yellow-50 dark:bg-yellow-950/20",
-      border: "bg-yellow-500",
-      label: "Caution",
+      topBar: "bg-yellow-500",
+      label: "Warning",
     },
     danger: {
       bar: "bg-red-500",
-      text: "text-red-600",
+      text: "text-red-600 dark:text-red-400",
       bg: "bg-red-50 dark:bg-red-950/20",
-      border: "bg-red-500",
+      topBar: "bg-red-500",
       label: "Danger",
     },
-  }[subject.status];
+  }[subject.riskLevel];
 
   return (
     <div className="bg-card rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden border border-border/50">
-      {/* Top color bar */}
-      <div className={`h-1.5 w-full ${statusConfig.border}`} />
+      <div className={`h-1.5 w-full ${config.topBar}`} />
 
       <div className="p-5">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <h3 className="font-bold text-foreground text-base leading-tight flex-1 pr-2">
-            {subject.name}
+            {subject.subjectName}
           </h3>
           <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${statusConfig.bg} ${statusConfig.text}`}
+            className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${config.bg} ${config.text}`}
           >
-            {statusConfig.label}
+            {config.label}
           </span>
         </div>
 
         {/* Percentage */}
         <div
-          className={`flex items-center justify-center p-4 rounded-xl mb-4 ${statusConfig.bg}`}
+          className={`flex items-center justify-center p-4 rounded-xl mb-4 ${config.bg}`}
         >
           <div className="text-center">
-            <div className={`text-4xl font-bold ${statusConfig.text}`}>
+            <div className={`text-4xl font-bold ${config.text}`}>
               {subject.attendancePercentage}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">
@@ -71,18 +66,18 @@ export default function SubjectCard({ subject }: Props) {
           </div>
         </div>
 
-        {/* Progress Bar */}
+        {/* Progress bar */}
         <div className="mb-4">
           <div className="w-full bg-muted/30 rounded-full h-2 overflow-hidden">
             <div
-              className={`h-full transition-all duration-700 rounded-full ${statusConfig.bar}`}
+              className={`h-full transition-all duration-700 rounded-full ${config.bar}`}
               style={{ width: `${subject.attendancePercentage}%` }}
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0%</span>
             <span className="font-medium">
-              {subject.minAttendanceRequired}% required
+              {subject.requiredPercentage}% required
             </span>
             <span>100%</span>
           </div>
@@ -93,12 +88,12 @@ export default function SubjectCard({ subject }: Props) {
           {[
             {
               label: "Attended",
-              value: subject.attendedClasses,
+              value: subject.presentClasses,
               color: "text-green-600",
             },
             {
               label: "Missed",
-              value: subject.missedClasses,
+              value: subject.absentClasses,
               color: "text-red-500",
             },
             {
@@ -116,17 +111,17 @@ export default function SubjectCard({ subject }: Props) {
           ))}
         </div>
 
-        {/* Action Alert */}
-        {!isSafe && subject.requiredClasses > 0 && (
+        {/* Recovery alert */}
+        {subject.classesNeededToRecover > 0 && (
           <div
             className={`p-3 rounded-lg mb-4 flex items-start gap-2 ${
-              isDanger
+              subject.riskLevel === "danger"
                 ? "bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400"
                 : "bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400"
             }`}
           >
             <svg
-              className="w-4 h-4 mt-0.5 shrink-0"
+              className="w-4 h-4 mt-0.5 flex-shrink-0"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -137,14 +132,15 @@ export default function SubjectCard({ subject }: Props) {
               />
             </svg>
             <span className="text-xs font-medium">
-              Attend <strong>{subject.requiredClasses}</strong> more class
-              {subject.requiredClasses > 1 ? "es" : ""} to reach{" "}
-              {subject.minAttendanceRequired}%
+              Attend <strong>{subject.classesNeededToRecover}</strong> more
+              class
+              {subject.classesNeededToRecover > 1 ? "es" : ""} to reach{" "}
+              {subject.requiredPercentage}%
             </span>
           </div>
         )}
 
-        {/* Expand Toggle */}
+        {/* Expand */}
         <button
           onClick={() => setExpanded((p) => !p)}
           className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-primary hover:bg-primary/5 rounded-lg transition-colors"
@@ -165,28 +161,26 @@ export default function SubjectCard({ subject }: Props) {
           </svg>
         </button>
 
-        {/* Expanded Details */}
+        {/* Expanded details */}
         {expanded && (
           <div className="mt-3 pt-3 border-t border-border/50 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Total Classes</span>
-              <span className="font-semibold text-foreground">
-                {subject.totalClasses}
-              </span>
+              <span className="font-semibold">{subject.totalClasses}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Attendance Rate</span>
-              <span className="font-semibold text-foreground">
-                {subject.attendedClasses}/{subject.totalClasses}
+              <span className="font-semibold">
+                {subject.presentClasses}/{subject.totalClasses}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">
-                Required for {subject.minAttendanceRequired}%
+                Required for {subject.requiredPercentage}%
               </span>
-              <span className="font-semibold text-foreground">
+              <span className="font-semibold">
                 {Math.ceil(
-                  subject.totalClasses * (subject.minAttendanceRequired / 100),
+                  subject.totalClasses * (subject.requiredPercentage / 100),
                 )}{" "}
                 classes
               </span>

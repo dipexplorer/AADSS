@@ -1,17 +1,9 @@
-// app/semester-statistics/components/StatisticsHeader.tsx
 "use client";
 
-interface Overall {
-  percentage: number;
-  attended: number;
-  total: number;
-  safeCount: number;
-  warningCount: number;
-  dangerCount: number;
-}
+import type { OverallAnalytics } from "@/lib/engines/analytics/types";
 
 interface Props {
-  overall: Overall;
+  overall: OverallAnalytics;
   programName: string;
   semesterNumber: string | number;
   sessionName: string;
@@ -24,23 +16,23 @@ export default function StatisticsHeader({
   sessionName,
 }: Props) {
   const statusColor =
-    overall.percentage >= 75
+    overall.overallPercentage >= 75
       ? "text-green-600"
-      : overall.percentage >= 70
+      : overall.overallPercentage >= 70
         ? "text-yellow-600"
         : "text-red-600";
 
   const barColor =
-    overall.percentage >= 75
+    overall.overallPercentage >= 75
       ? "bg-green-500"
-      : overall.percentage >= 70
+      : overall.overallPercentage >= 70
         ? "bg-yellow-500"
         : "bg-red-500";
 
   const statusLabel =
-    overall.percentage >= 75
+    overall.overallPercentage >= 75
       ? "Safe Zone"
-      : overall.percentage >= 70
+      : overall.overallPercentage >= 70
         ? "Caution Zone"
         : "Danger Zone";
 
@@ -67,7 +59,7 @@ export default function StatisticsHeader({
         >
           <div className="text-center">
             <div className={`text-4xl font-bold tracking-tight ${statusColor}`}>
-              {overall.percentage}%
+              {overall.overallPercentage}%
             </div>
             <div className={`text-sm font-semibold mt-0.5 ${statusColor}`}>
               {statusLabel}
@@ -79,13 +71,13 @@ export default function StatisticsHeader({
           <div className="text-sm text-muted-foreground space-y-1">
             <div>
               <span className="font-semibold text-foreground">
-                {overall.attended}
+                {overall.presentClasses}
               </span>{" "}
               attended
             </div>
             <div>
               <span className="font-semibold text-foreground">
-                {overall.total}
+                {overall.totalClasses}
               </span>{" "}
               total classes
             </div>
@@ -98,7 +90,7 @@ export default function StatisticsHeader({
         <div className="w-full bg-muted/30 rounded-full h-3 overflow-hidden">
           <div
             className={`h-full transition-all duration-1000 rounded-full ${barColor}`}
-            style={{ width: `${overall.percentage}%` }}
+            style={{ width: `${overall.overallPercentage}%` }}
           />
         </div>
       </div>
@@ -108,17 +100,17 @@ export default function StatisticsHeader({
         {[
           {
             label: "Safe",
-            count: overall.safeCount,
+            count: overall.safeSubjectsCount,
             color: "text-green-600 bg-green-50 dark:bg-green-950/20",
           },
           {
             label: "Warning",
-            count: overall.warningCount,
+            count: overall.warningSubjectsCount,
             color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20",
           },
           {
             label: "Danger",
-            count: overall.dangerCount,
+            count: overall.dangerSubjectsCount,
             color: "text-red-600 bg-red-50 dark:bg-red-950/20",
           },
         ].map(({ label, count, color }) => (
