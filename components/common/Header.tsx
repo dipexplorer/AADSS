@@ -127,7 +127,7 @@ export default function Header() {
             href="/calendar-dashboard"
             className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
           >
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
               <svg
                 className="w-5 h-5 text-primary-foreground"
                 fill="currentColor"
@@ -193,7 +193,7 @@ export default function Header() {
                 aria-label="Settings"
               >
                 <svg
-                  className="w-4.5 h-4.5 w-[18px] h-[18px]"
+                  className="w-[18px] h-[18px]"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
