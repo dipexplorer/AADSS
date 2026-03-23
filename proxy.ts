@@ -31,9 +31,34 @@ export async function proxy(req: NextRequest) {
 
   // Define routes properly (clean separation)
   // Public routes — login nahi chahiye
+  const isAdminRoute =
+    pathname.startsWith("/admin") && pathname !== "/admin/login";
+  const isAdminLogin = pathname === "/admin/login";
   const publicRoutes = ["/", "/login", "/register", "/verify-email"];
   const isPublicRoute = publicRoutes.includes(pathname);
 
+  // ── Admin routes ──────────────────────────────────────────────
+  if (isAdminLogin) {
+    // Admin already logged in → redirect to admin dashboard
+    if (user && user.user_metadata?.role === "admin") {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
+    return res;
+  }
+
+  if (isAdminRoute) {
+    // Not logged in → admin login
+    if (!user) {
+      return NextResponse.redirect(new URL("/admin/login", req.url));
+    }
+    // Logged in but not admin → student login (wrong portal)
+    if (user.user_metadata?.role !== "admin") {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+    return res;
+  }
+
+  // ── Student routes ────────────────────────────────────────────
   // Protect private routes
   if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -43,11 +68,19 @@ export async function proxy(req: NextRequest) {
   // Logged in + public route → calendar dashboard
 
   if (user && isPublicRoute && pathname !== "/") {
+    // Admin trying to access student portal → redirect to admin
+    if (user.user_metadata?.role === "admin") {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
     return NextResponse.redirect(new URL("/calendar-dashboard", req.url));
   }
 
   // Logged in + protected route → check profile
   if (user && !isPublicRoute && pathname !== "/onboarding") {
+    // Admin trying to access student profile → redirect to admin
+    if (user.user_metadata?.role === "admin") {
+      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
+    }
     const { data: profile } = await supabase
       .from("student_profiles")
       .select("id")
