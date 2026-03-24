@@ -175,7 +175,6 @@ export async function getAnalyticsSummary(
     return {
       subjectId: subject.id,
       subjectName: subject.name,
-      creditHours: 3, // Default value since column is missing in schema
       totalClasses,
       presentClasses,
       absentClasses,

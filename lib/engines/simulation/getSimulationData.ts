@@ -1,4 +1,6 @@
 // lib/engines/simulation/getSimulationData.ts
+"use server";
+
 import { createClient } from "@/lib/supabase/server";
 import { SubjectSimInput } from "./types";
 

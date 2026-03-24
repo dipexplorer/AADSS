@@ -1,7 +1,6 @@
 export interface SubjectAnalytics {
   subjectId: string;
   subjectName: string;
-  creditHours: number;
 
   // Raw counts
   totalClasses: number;

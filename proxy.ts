@@ -40,7 +40,7 @@ export async function proxy(req: NextRequest) {
   // ── Admin routes ──────────────────────────────────────────────
   if (isAdminLogin) {
     // Admin already logged in → redirect to admin dashboard
-    if (user && user.user_metadata?.role === "admin") {
+    if (user && user.app_metadata?.role === "admin") {
       return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }
     return res;
@@ -52,7 +52,7 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(new URL("/admin/login", req.url));
     }
     // Logged in but not admin → student login (wrong portal)
-    if (user.user_metadata?.role !== "admin") {
+    if (user.app_metadata?.role !== "admin") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
     return res;
@@ -69,7 +69,7 @@ export async function proxy(req: NextRequest) {
 
   if (user && isPublicRoute && pathname !== "/") {
     // Admin trying to access student portal → redirect to admin
-    if (user.user_metadata?.role === "admin") {
+    if (user.app_metadata?.role === "admin") {
       return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }
     return NextResponse.redirect(new URL("/calendar-dashboard", req.url));
@@ -78,7 +78,7 @@ export async function proxy(req: NextRequest) {
   // Logged in + protected route → check profile
   if (user && !isPublicRoute && pathname !== "/onboarding") {
     // Admin trying to access student profile → redirect to admin
-    if (user.user_metadata?.role === "admin") {
+    if (user.app_metadata?.role === "admin") {
       return NextResponse.redirect(new URL("/admin/dashboard", req.url));
     }
     const { data: profile } = await supabase

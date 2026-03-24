@@ -29,7 +29,7 @@ export default function AdminLoginPage() {
       }
 
       // Role check
-      if (data.user?.user_metadata?.role !== "admin") {
+      if (data.user?.app_metadata?.role !== "admin") {
         await supabase.auth.signOut();
         toast.error("Access denied. Admin credentials required.");
         return;
