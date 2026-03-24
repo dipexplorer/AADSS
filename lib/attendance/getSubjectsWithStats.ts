@@ -9,6 +9,7 @@ export interface SubjectWithStats {
   totalClasses: number;
   attendedClasses: number;
   missedClasses: number;
+  cancelledClasses: number;
   attendancePercentage: number;
   status: "safe" | "warning" | "danger";
   requiredClasses: number;
@@ -70,6 +71,10 @@ export async function getSubjectsWithStats(
         subjectSessions.some((s) => s.id === a.class_session_id),
     ).length;
 
+    const cancelledClasses = (sessions ?? []).filter(
+      (s) => s.subject_id === subject.id && s.status === "cancelled",
+    ).length;
+
     const missedClasses = totalClasses - attendedClasses;
     const minRequired = subject.min_attendance_required ?? 75;
 
@@ -99,6 +104,7 @@ export async function getSubjectsWithStats(
       totalClasses,
       attendedClasses,
       missedClasses,
+      cancelledClasses,
       attendancePercentage,
       status,
       requiredClasses,

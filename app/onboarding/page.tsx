@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { createProfile } from "@/server/auth/completeProfile";
@@ -22,7 +22,7 @@ export default function OnboardingPage() {
   const [sessionId, setSessionId] = useState("");
   const [semesterId, setSemesterId] = useState("");
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // Programs fetch
   useEffect(() => {

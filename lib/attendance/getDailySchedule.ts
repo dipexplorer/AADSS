@@ -3,6 +3,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { generateClassSessionsForDate } from "./generateClassSessions";
+import { autoCompletePastSessions } from "./autoCompleteSession";
 
 export interface ClassPeriod {
   sessionId: string;
@@ -29,10 +30,14 @@ export async function getDailySchedule(
     return { data: [], error: null };
   }
 
-  // Auto-generate sessions agar exist nahi karte
-  await generateClassSessionsForDate(date, semesterId);
+  // Auto-generate sessions agar exist nahi karte + auto-complete past sessions
+  await Promise.all([
+    generateClassSessionsForDate(date, semesterId),
+    autoCompletePastSessions(semesterId),
+  ]);
 
   // Is date ke class sessions fetch karo with subject info
+  // !inner join se sirf is semester ke subjects filter ho jaayenge
   const { data: sessions, error: sessionsError } = await supabase
     .from("class_sessions")
     .select(
@@ -45,22 +50,14 @@ export async function getDailySchedule(
       timetable (
         room
       ),
-      subjects (
-        name
+      subjects!inner (
+        name,
+        semester_id
       )
     `,
     )
     .eq("date", date)
-    .in(
-      "subject_id",
-      // Sirf is semester ke subjects
-      (
-        await supabase
-          .from("subjects")
-          .select("id")
-          .eq("semester_id", semesterId)
-      ).data?.map((s) => s.id) ?? [],
-    )
+    .eq("subjects.semester_id", semesterId)
     .order("start_time", { ascending: true });
 
   if (sessionsError) return { data: null, error: sessionsError.message };
@@ -82,17 +79,23 @@ export async function getDailySchedule(
     });
   }
 
-  const result: ClassPeriod[] = sessions.map((s) => ({
-    sessionId: s.id,
-    subjectId: s.subject_id,
-    subjectName: (s.subjects as any)?.name ?? "Unknown",
-    startTime: s.start_time,
-    endTime: s.end_time,
-    room: (s.timetable as any)?.room ?? null,
-    status: s.status as ClassPeriod["status"],
-    attendanceStatus:
-      (attendanceMap[s.id] as ClassPeriod["attendanceStatus"]) ?? null,
-  }));
+  const result: ClassPeriod[] = sessions.map((s) => {
+    // Supabase returns joined relations as objects (not arrays for singular FK)
+    const subjectData = s.subjects as unknown as { name: string; semester_id: string } | null;
+    const timetableData = s.timetable as unknown as { room: string | null } | null;
+
+    return {
+      sessionId: s.id,
+      subjectId: s.subject_id,
+      subjectName: subjectData?.name ?? "Unknown",
+      startTime: s.start_time,
+      endTime: s.end_time,
+      room: timetableData?.room ?? null,
+      status: s.status as ClassPeriod["status"],
+      attendanceStatus:
+        (attendanceMap[s.id] as ClassPeriod["attendanceStatus"]) ?? null,
+    };
+  });
 
   return { data: result, error: null };
 }

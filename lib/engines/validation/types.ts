@@ -6,6 +6,7 @@ export interface ValidationResult {
 }
 
 export type ValidationError =
+  | "TOO_EARLY" // Class abhi start nahi hui
   | "TIME_WINDOW_EXPIRED" // 10 min window khatam
   | "OUTSIDE_GEOFENCE" // Location match nahi
   | "ALREADY_MARKED" // Duplicate

@@ -94,15 +94,23 @@ export async function markAttendance(
     10, // 10 minute window
   );
   if (!timingCheck.valid) {
+    const errorMessage =
+      timingCheck.error === "TOO_EARLY"
+        ? "Class has not started yet. You can mark attendance once the class begins."
+        : "Attendance window has expired. You can only mark present within 10 minutes of class start.";
     return {
-      error:
-        "Attendance window has expired. You can only mark present within 10 minutes of class start.",
+      error: errorMessage,
       validationError: timingCheck.error,
     };
   }
 
   // 4. Geo-fence validation (only if classroom has coordinates)
-  const timetable = session.timetable as any;
+  const timetable = session.timetable as unknown as {
+    latitude?: number;
+    longitude?: number;
+    allowed_radius?: number;
+    room?: string;
+  } | null;
   if (
     timetable?.latitude &&
     timetable?.longitude &&

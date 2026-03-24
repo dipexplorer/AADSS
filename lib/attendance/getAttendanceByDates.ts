@@ -68,7 +68,8 @@ export async function getAttendanceByDates(
 
     if (record?.status === "present") {
       result[dateStr].attended++;
-    } else if (record?.status === "absent") {
+    } else {
+      // No record OR explicitly absent → counted as missed
       result[dateStr].missed++;
     }
   });

@@ -30,7 +30,7 @@ export function validateAttendanceTiming(
   if (now < classStart) {
     return {
       valid: false,
-      error: "TIME_WINDOW_EXPIRED",
+      error: "TOO_EARLY",
     };
   }
 

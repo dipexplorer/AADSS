@@ -12,15 +12,28 @@ export async function generateClassSessionsForDate(
   const dateObj = new Date(date + "T00:00:00");
   const dayOfWeek = dateObj.getDay();
 
-  // Is date ke sessions already exist karte hain?
+  // Is semester ke subjects fetch karo
+  const { data: semesterSubjects } = await supabase
+    .from("subjects")
+    .select("id")
+    .eq("semester_id", semesterId);
+
+  if (!semesterSubjects || semesterSubjects.length === 0) {
+    return { generated: 0, error: null };
+  }
+
+  const subjectIds = semesterSubjects.map((s) => s.id);
+
+  // Is date + semester ke sessions already exist karte hain?
   const { data: existing } = await supabase
     .from("class_sessions")
     .select("id")
     .eq("date", date)
+    .in("subject_id", subjectIds)
     .limit(1);
 
   if (existing && existing.length > 0) {
-    return { generated: 0, error: null }; // Already generated
+    return { generated: 0, error: null }; // Already generated for this semester
   }
 
   // Is semester ke subjects ke liye timetable fetch karo
