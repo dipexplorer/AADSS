@@ -14,7 +14,13 @@ import {
 import { toast } from "react-hot-toast";
 import DateNavigator from "@/app/daily-attendance/components/DateNavigator";
 import ScheduleTimeline from "@/app/daily-attendance/components/ScheduleTimeline";
+import dynamic from "next/dynamic";
 import type { GeoLocation } from "@/lib/engines/validation/types";
+
+const NotesEditor = dynamic(
+  () => import("@/app/daily-attendance/components/NotesEditor"),
+  { ssr: false }
+);
 
 interface Profile {
   id: string;
@@ -174,6 +180,9 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
           date={date}
           onStatusChange={handleStatusChange}
         />
+
+        {/* Daily Notes Editor */}
+        <NotesEditor profile={profile} date={date} />
       </div>
     </div>
   );
