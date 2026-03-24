@@ -1,7 +1,7 @@
 // app/calendar-dashboard/components/CalendarDashboardInteractive.tsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getSubjectsWithStats,
@@ -33,11 +33,8 @@ interface CalendarDashboardInteractiveProps {
 export default function CalendarDashboardInteractive({
   profile,
 }: CalendarDashboardInteractiveProps) {
-  const [currentYear, setCurrentYear] = useState(
-    profile.academic_sessions
-      ? new Date(profile.academic_sessions.start_date).getFullYear()
-      : new Date().getFullYear(),
-  );
+  // Default to the current real-world year so the calendar always centers reliably
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   const [subjects, setSubjects] = useState<SubjectWithStats[]>([]);
   const [overallStats, setOverallStats] = useState({
@@ -46,6 +43,9 @@ export default function CalendarDashboardInteractive({
     total: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+
+  const currentMonthRef = useRef<HTMLDivElement>(null);
 
   const semesterStart = profile.academic_sessions?.start_date ?? "";
   const semesterEnd = profile.academic_sessions?.end_date ?? "";
@@ -78,7 +78,33 @@ export default function CalendarDashboardInteractive({
     }
 
     fetchStats();
-  }, [profile.semester_id, profile.id]);
+  }, [profile.semester_id, profile.id, refetchTrigger]);
+
+  // Real-time synchronization
+  useEffect(() => {
+    if (!profile.id) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel("calendar_dashboard_stats")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "attendance",
+          filter: `student_id=eq.${profile.id}`,
+        },
+        () => {
+          // Trigger a silent refetch
+          setRefetchTrigger((prev) => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile.id]);
 
   const months = Array.from({ length: 12 }, (_, i) => i);
 
@@ -116,16 +142,8 @@ export default function CalendarDashboardInteractive({
   return (
     <div className="min-h-screen bg-background pt-[60px] pb-20 md:pb-6">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Year Progress */}
-        <div className="mb-6">
-          <YearProgressCard
-            semesterStart={semesterStart}
-            semesterEnd={semesterEnd}
-          />
-        </div>
-
         {/* Year Navigator */}
-        <div className="mb-8">
+        <div className="flex justify-center mb-8">
           <YearNavigator
             initialYear={currentYear}
             onYearChange={setCurrentYear}
@@ -134,18 +152,27 @@ export default function CalendarDashboardInteractive({
 
         {/* Calendar Grid + Sidebar */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            {months.map((month) => (
-              <MonthCalendar
-                key={month}
-                year={currentYear}
-                month={month}
-                semesterStart={semesterStart}
-                semesterEnd={semesterEnd}
-                studentProfileId={profile.id}
-                semesterId={profile.semester_id}
-              />
-            ))}
+          <div className="lg:col-span-2 space-y-6 lg:max-h-[calc(100vh-140px)] overflow-y-auto pr-2 pb-20 custom-scrollbar relative">
+            {months.map((month) => {
+                const isCurrentMonth =
+                  currentYear === new Date().getFullYear() &&
+                  month === new Date().getMonth();
+                return (
+                  <div
+                    key={month}
+                    className="transition-all duration-300"
+                  >
+                  <MonthCalendar
+                    year={currentYear}
+                    month={month}
+                    semesterStart={semesterStart}
+                    semesterEnd={semesterEnd}
+                    studentProfileId={profile.id}
+                    semesterId={profile.semester_id}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           <div className="lg:col-span-1">

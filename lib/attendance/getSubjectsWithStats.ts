@@ -35,9 +35,8 @@ export async function getSubjectsWithStats(
 
   const { data: sessions, error: sessionsError } = await supabase
     .from("class_sessions")
-    .select("id, subject_id, status")
-    .in("subject_id", subjectIds)
-    .neq("status", "scheduled"); // only completed/cancelled
+    .select("id, subject_id, status, date")
+    .in("subject_id", subjectIds);
 
   if (sessionsError) return { data: null, error: sessionsError.message };
 
@@ -57,9 +56,26 @@ export async function getSubjectsWithStats(
     attendanceRecords = attendance ?? [];
   }
 
+  const todayObj = new Date();
+  const todayStr = 
+    todayObj.getFullYear() + "-" + 
+    String(todayObj.getMonth() + 1).padStart(2, '0') + "-" + 
+    String(todayObj.getDate()).padStart(2, '0');
+    
+  const attendedSessionIds = new Set(attendanceRecords.map((a) => a.class_session_id));
+
+  // A session "counts" if it's completed, cancelled, happened in the past, or was explicitly marked
+  const validSessions = (sessions ?? []).filter(
+    (s) =>
+      s.status === "completed" ||
+      s.status === "cancelled" ||
+      s.date <= todayStr ||
+      attendedSessionIds.has(s.id),
+  );
+
   // 4. Calculate stats per subject
   const result: SubjectWithStats[] = subjects.map((subject) => {
-    const subjectSessions = (sessions ?? []).filter(
+    const subjectSessions = validSessions.filter(
       (s) => s.subject_id === subject.id && s.status !== "cancelled",
     );
 
@@ -71,7 +87,7 @@ export async function getSubjectsWithStats(
         subjectSessions.some((s) => s.id === a.class_session_id),
     ).length;
 
-    const cancelledClasses = (sessions ?? []).filter(
+    const cancelledClasses = validSessions.filter(
       (s) => s.subject_id === subject.id && s.status === "cancelled",
     ).length;
 

@@ -1,10 +1,11 @@
 // app/calendar-dashboard/components/MonthCalendar.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getAttendanceByDates } from "@/lib/attendance/getAttendanceByDates";
 import { formatLocalDate } from "@/lib/utils/dateUtils";
+import { createClient } from "@/lib/supabase/client";
 
 interface DayData {
   date: number;
@@ -15,6 +16,8 @@ interface DayData {
   isWeekend: boolean;
   attended: number;
   missed: number;
+  cancelled: number;
+  isCurrentWeek: boolean;
 }
 
 interface MonthCalendarProps {
@@ -55,6 +58,9 @@ export default function MonthCalendar({
   const router = useRouter();
   const [calendarDays, setCalendarDays] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasScrolledRef = useRef(false);
 
   useEffect(() => {
     async function build() {
@@ -67,6 +73,13 @@ export default function MonthCalendar({
       const semEnd = new Date(semesterEnd);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+
+      // Current week range
+      const dayOfWeek = today.getDay();
+      const currentWeekStart = new Date(today);
+      currentWeekStart.setDate(today.getDate() - dayOfWeek);
+      const currentWeekEnd = new Date(today);
+      currentWeekEnd.setDate(today.getDate() + (6 - dayOfWeek));
 
       // Collect all dates in month
       const monthDates: string[] = [];
@@ -104,6 +117,8 @@ export default function MonthCalendar({
           isWeekend: false,
           attended: 0,
           missed: 0,
+          cancelled: 0,
+          isCurrentWeek: false,
         });
       }
 
@@ -124,6 +139,8 @@ export default function MonthCalendar({
           isWeekend: cur.getDay() === 0 || cur.getDay() === 6,
           attended: att?.attended ?? 0,
           missed: att?.missed ?? 0,
+          cancelled: att?.cancelled ?? 0,
+          isCurrentWeek: cur >= currentWeekStart && cur <= currentWeekEnd,
         });
       }
 
@@ -139,6 +156,8 @@ export default function MonthCalendar({
           isWeekend: false,
           attended: 0,
           missed: 0,
+          cancelled: 0,
+          isCurrentWeek: false,
         });
       }
 
@@ -147,7 +166,40 @@ export default function MonthCalendar({
     }
 
     build();
-  }, [year, month, semesterStart, semesterEnd, studentProfileId, semesterId]);
+  }, [
+    year,
+    month,
+    semesterStart,
+    semesterEnd,
+    studentProfileId,
+    semesterId,
+    refetchTrigger,
+  ]);
+
+  // Real-time synchronization
+  useEffect(() => {
+    if (!studentProfileId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`calendar_${year}_${month}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "attendance",
+          filter: `student_id=eq.${studentProfileId}`,
+        },
+        () => {
+          setRefetchTrigger((prev) => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [studentProfileId, year, month]);
 
   const getIndicator = (day: DayData) => {
     const total = day.attended + day.missed;
@@ -160,10 +212,27 @@ export default function MonthCalendar({
     return <div className={`w-2 h-2 rounded-full ${color}`} />;
   };
 
+  const isCurrentSessionMonth = 
+    year === new Date().getFullYear() && month === new Date().getMonth();
+
+  useEffect(() => {
+    if (!loading && isCurrentSessionMonth && containerRef.current && !hasScrolledRef.current) {
+      hasScrolledRef.current = true;
+      // Small timeout to allow the browser to paint the new DOM height
+      setTimeout(() => {
+        containerRef.current?.scrollIntoView({
+          behavior: "instant",
+          block: "start",
+        });
+      }, 50);
+    }
+  }, [loading, isCurrentSessionMonth]);
+
   if (loading) {
     return (
       <div
-        className={`bg-card rounded-xl p-6 border border-border/50 ${className}`}
+        ref={containerRef}
+        className={`bg-card rounded-2xl p-6 border border-border/50 ${className}`}
       >
         <div className="h-5 bg-muted/30 rounded w-24 mb-4 animate-pulse" />
         <div className="grid grid-cols-7 gap-2">
@@ -180,20 +249,21 @@ export default function MonthCalendar({
 
   return (
     <div
-      className={`bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6 ${className}`}
+      ref={containerRef}
+      className={`bg-card border border-border/50 rounded-2xl shadow-sm p-8 ${className}`}
     >
-      <h3 className="text-lg font-bold text-foreground tracking-tight mb-4">
+      <h3 className="text-xl font-extrabold text-foreground tracking-tight mb-6">
         {MONTH_NAMES[month]}
       </h3>
 
       {/* Week headers */}
-      <div className="grid grid-cols-7 gap-3 mb-2">
+      <div className="grid grid-cols-7 gap-4 mb-3">
         {WEEK_DAYS.map((d) => (
           <div
             key={d}
-            className={`text-center text-[0.65rem] uppercase tracking-wider font-bold py-2 ${
+            className={`text-center text-[0.65rem] uppercase tracking-wider font-extrabold py-2 ${
               d === "Sun" || d === "Sat"
-                ? "text-red-400/70"
+                ? "text-red-400/80"
                 : "text-muted-foreground"
             }`}
           >
@@ -203,28 +273,29 @@ export default function MonthCalendar({
       </div>
 
       {/* Days grid */}
-      <div className="grid grid-cols-7 gap-3">
+      <div className="grid grid-cols-7 gap-4">
         {calendarDays.map((day, index) => {
           let cls =
-            "relative aspect-square rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200";
+            "relative aspect-[4/3] rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 border border-transparent";
 
-          if (!day.isCurrentMonth) {
-            cls += " opacity-20 cursor-not-allowed bg-muted/10";
+          const isSundayOrSaturday = day.isWeekend;
+
+          // Background base
+          if (isSundayOrSaturday) {
+            cls += " bg-red-50/60 dark:bg-red-950/20";
           } else {
-            cls += " cursor-pointer";
-            if (day.isWeekend) {
-              cls +=
-                " bg-red-50/50 dark:bg-red-950/20 border border-transparent";
-            } else if (day.isSemesterDay) {
-              cls +=
-                " bg-primary/5 hover:bg-primary/10 border border-primary/10";
-            } else {
-              cls += " bg-muted/20 hover:bg-muted/40 border border-transparent";
-            }
-            if (day.isToday) {
-              cls +=
-                " ring-2 ring-primary ring-offset-1 ring-offset-background z-10";
-            }
+            cls += " bg-slate-50/60 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800";
+          }
+
+          if (day.isCurrentMonth) {
+            cls += " hover:shadow-sm cursor-pointer hover:-translate-y-0.5";
+          } else {
+            cls += " opacity-40 cursor-default";
+          }
+
+          // Figma layout for "Today" specifically requests a blue border, white bg, blue text
+          if (day.isToday && day.isCurrentMonth) {
+             cls = "relative aspect-[4/3] rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer hover:shadow-sm hover:-translate-y-0.5 bg-background border border-blue-500 shadow-sm";
           }
 
           return (
@@ -239,19 +310,23 @@ export default function MonthCalendar({
               aria-label={`${MONTH_NAMES[month]} ${day.date}, ${year}`}
             >
               <span
-                className={`text-sm font-semibold ${
-                  day.isToday
-                    ? "text-primary"
-                    : day.isWeekend && day.isCurrentMonth
-                      ? "text-red-500/70 dark:text-red-300/70"
-                      : "text-foreground/80"
+                className={`text-sm font-bold ${
+                  day.isToday && day.isCurrentMonth
+                    ? "text-blue-500"
+                    : isSundayOrSaturday && day.isCurrentMonth
+                      ? "text-red-500/80 dark:text-red-400/80"
+                      : day.isCurrentMonth
+                        ? "text-foreground"
+                        : "text-muted-foreground"
                 }`}
               >
                 {day.date}
               </span>
 
               {day.isCurrentMonth && !day.isWeekend && day.isSemesterDay && (
-                <div className="h-1.5 flex items-end">{getIndicator(day)}</div>
+                <div className="absolute bottom-2 flex items-center justify-center w-full">
+                  {getIndicator(day)}
+                </div>
               )}
             </button>
           );
