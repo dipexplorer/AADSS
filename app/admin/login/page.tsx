@@ -5,6 +5,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
+import Link from "next/link";
+import {
+  Shield,
+  Mail,
+  Lock,
+  Sparkles,
+  ArrowRight,
+  Loader2,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -45,79 +57,90 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
-      <div className="w-full max-w-md">
-        {/* Logo / Title */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-9 h-9 text-primary-foreground"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            </svg>
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background font-sans dark">
+      {/* Dynamic Background Mesh Gradient - Monochrome/Zinc style */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))] from-zinc-600/20 via-background to-black/90 pointer-events-none" />
+      <div className="absolute -top-[40%] -right-[10%] w-[70%] h-[70%] rounded-full bg-zinc-500/20 blur-[120px] pointer-events-none mix-blend-screen" />
+      <div className="absolute -bottom-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-zinc-700/20 blur-[100px] pointer-events-none mix-blend-screen" />
+
+      {/* Floating Sparkles for depth */}
+      <Sparkles className="absolute top-[15%] left-[20%] text-zinc-400/30 w-8 h-8 animate-pulse" />
+      <Sparkles className="absolute bottom-[20%] right-[25%] text-zinc-500/20 w-12 h-12 animate-pulse" />
+
+      {/* Main Login Card */}
+      <div className="relative w-full max-w-md p-8 md:p-10 mx-4 bg-background/60 backdrop-blur-3xl border border-zinc-800/50 rounded-[2rem] shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] z-10 transition-transform duration-500 hover:scale-[1.01]">
+        {/* Header Logo & Title */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-zinc-800/80 flex items-center justify-center mb-6 shadow-xl shadow-black/40 ring-1 ring-white/10">
+            <Shield className="text-zinc-100 w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Admin Portal</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-br from-white to-zinc-400 mb-2 text-center tracking-tight">
+            Admin Portal
+          </h1>
+          <p className="text-zinc-400 text-sm text-center font-medium">
             Acadence — Restricted Access
           </p>
         </div>
 
-        {/* Form */}
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Admin Email
-              </label>
-              <input
+        {/* Login Form */}
+        <form onSubmit={handleLogin} className="space-y-6">
+          <div className="space-y-4">
+            <div className="relative group">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 group-focus-within:text-zinc-200 transition-colors" />
+              <Input
                 type="email"
+                placeholder="admin@acadence.in"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@acadence.in"
+                className="w-full pl-12 pr-4 py-6 bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:border-transparent rounded-xl transition-all"
                 required
-                className="w-full px-4 py-2.5 bg-white/10 border border-white/10 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Password
-              </label>
-              <input
+            <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 group-focus-within:text-zinc-200 transition-colors" />
+              <Input
                 type="password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                className="w-full pl-12 pr-4 py-6 bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:border-transparent rounded-xl transition-all"
                 required
-                className="w-full px-4 py-2.5 bg-white/10 border border-white/10 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
               />
             </div>
-
-            <button
-              type="submit"
-              disabled={isPending}
-              className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isPending ? "Authenticating..." : "Sign In"}
-            </button>
-          </form>
-
-          <div className="mt-6 pt-5 border-t border-white/10 text-center">
-            <a
-              href="/login"
-              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              Student Portal →
-            </a>
           </div>
+
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="w-full py-6 mt-2 bg-zinc-100 hover:bg-white text-zinc-900 font-semibold rounded-xl transition-all duration-300 hover:shadow-xl hover:shadow-zinc-200/20 active:scale-[0.98]"
+          >
+            {isPending ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Authenticating...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                Sign In
+                <ArrowRight className="w-5 h-5" />
+              </span>
+            )}
+          </Button>
+        </form>
+
+        {/* Footer */}
+        <div className="mt-8 pt-6 border-t border-zinc-800/50 text-center text-sm">
+          <Link
+            href="/login"
+            className="text-zinc-400 font-medium hover:text-zinc-200 transition-colors inline-flex items-center gap-2"
+          >
+            <ArrowRight className="w-4 h-4 rotate-180" />
+            Return to Student Portal
+          </Link>
         </div>
       </div>
     </div>
   );
 }
+
