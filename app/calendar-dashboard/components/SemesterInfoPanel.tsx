@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { SubjectWithStats } from "@/lib/attendance/getSubjectsWithStats";
+import { SubjectWithStats } from "@/lib/attendance/getSubjectsWithStatsClient";
 
 interface SemesterInfoPanelProps {
   semesterStart: string;

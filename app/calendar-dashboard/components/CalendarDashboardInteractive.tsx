@@ -4,10 +4,10 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  getSubjectsWithStats,
+  getSubjectsWithStatsClient,
+  getOverallAttendanceStatsClient,
   SubjectWithStats,
-} from "@/lib/attendance/getSubjectsWithStats";
-import { getOverallAttendanceStats } from "@/lib/attendance/getOverallStats";
+} from "@/lib/attendance/getSubjectsWithStatsClient";
 import YearNavigator from "@/app/calendar-dashboard/components/YearNavigator";
 import MonthCalendar from "@/app/calendar-dashboard/components/MonthCalendar";
 import SemesterInfoPanel from "@/app/calendar-dashboard/components/SemesterInfoPanel";
@@ -60,8 +60,8 @@ export default function CalendarDashboardInteractive({
       setLoading(true);
       try {
         const [subjectsResult, statsResult] = await Promise.all([
-          getSubjectsWithStats(profile.semester_id, profile.id),
-          getOverallAttendanceStats(profile.semester_id, profile.id),
+          getSubjectsWithStatsClient(profile.semester_id, profile.id),
+          getOverallAttendanceStatsClient(profile.semester_id, profile.id),
         ]);
 
         setSubjects(subjectsResult.data ?? []);

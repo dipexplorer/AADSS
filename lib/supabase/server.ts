@@ -13,10 +13,15 @@ export function createClient() {
       async getAll() {
         return (await cookieStore).getAll();
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(async ({ name, value, options }) =>
-          (await cookieStore).set(name, value, options),
-        );
+      async setAll(cookiesToSet) {
+        try {
+          const store = await cookieStore;
+          cookiesToSet.forEach(({ name, value, options }) =>
+            store.set(name, value, options),
+          );
+        } catch (error) {
+          console.error("Error setting cookies:", error);
+        }
       },
     },
   });

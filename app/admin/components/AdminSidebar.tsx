@@ -131,8 +131,13 @@ export default function AdminSidebar() {
   async function handleSignOut() {
     setSigningOut(true);
     const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/admin/login");
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Failed to sign out from server:", error);
+    } finally {
+      router.push("/admin/login");
+    }
   }
 
   return (

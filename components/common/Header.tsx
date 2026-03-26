@@ -128,8 +128,13 @@ export default function Header() {
   async function handleSignOut() {
     setSigningOut(true);
     setSettingsOpen(false);
-    await supabase.auth.signOut();
-    router.push("/login");
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Failed to sign out from server:", error);
+    } finally {
+      router.push("/login");
+    }
   }
 
   function isActive(href: string) {
