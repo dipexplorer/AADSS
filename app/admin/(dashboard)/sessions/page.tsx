@@ -1,28 +1,20 @@
-// app/admin/sessions/page.tsx
+// app/admin/(dashboard)/sessions/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import SessionsClient from "./components/SessionsClient";
 
 export default async function AdminSessionsPage() {
   const supabase = createClient();
 
-  const [{ data: sessions }, { data: programs }, { data: semesters }] =
-    await Promise.all([
-      supabase
-        .from("academic_sessions")
-        .select("*")
-        .order("start_date", { ascending: false }),
-      supabase.from("programs").select("*").order("name"),
-      supabase
-        .from("semesters")
-        .select("*, programs(name)")
-        .order("semester_number"),
-    ]);
+  const { data: sessions } = await supabase
+    .from("academic_sessions")
+    .select("*, programs(count)")
+    .order("start_date", { ascending: false });
 
-  return (
-    <SessionsClient
-      sessions={sessions ?? []}
-      programs={programs ?? []}
-      semesters={semesters ?? []}
-    />
-  );
+  // Map the nested count to a flat property for the client
+  const formattedSessions = (sessions ?? []).map((session) => ({
+    ...session,
+    programs_count: session.programs?.[0]?.count ?? 0,
+  }));
+
+  return <SessionsClient sessions={formattedSessions} />;
 }

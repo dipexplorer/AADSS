@@ -3,38 +3,43 @@ create table academic_sessions (
   id uuid primary key default uuid_generate_v4(),
   name text not null, -- "2025-2026"
   start_date date,
-  end_date date
+  end_date date,
+  status text check (status in ('active', 'inactive', 'archived')) default 'active'
 );
 
 -- Program table
 create table programs (
   id uuid primary key default uuid_generate_v4(),
-  name text not null -- "B.Tech CSE"
+  session_id uuid references academic_sessions(id) on delete restrict,
+  name text not null, -- "B.Tech CSE"
+  status text check (status in ('active', 'inactive', 'archived')) default 'active'
 );
 
 -- Semester table
 create table semesters (
   id uuid primary key default uuid_generate_v4(),
-  program_id uuid references programs(id) on delete cascade,
-  semester_number int not null
+  program_id uuid references programs(id) on delete restrict,
+  semester_number int not null,
+  status text check (status in ('active', 'inactive', 'archived')) default 'active'
 );
 
 -- STUDENT PROFILE
 create table student_profiles (
   id uuid primary key default uuid_generate_v4(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  session_id uuid not null references academic_sessions(id),
-  program_id uuid not null references programs(id) ,
-  semester_id uuid not null references semesters(id),
+  user_id uuid not null references auth.users(id) on delete restrict,
+  session_id uuid not null references academic_sessions(id) on delete restrict,
+  program_id uuid not null references programs(id) on delete restrict,
+  semester_id uuid not null references semesters(id) on delete restrict,
   created_at timestamp default now()
 );
 
 -- SUBJECTS
 create table subjects (
   id uuid primary key default uuid_generate_v4(),
-  semester_id uuid not null references semesters(id) on delete cascade,
+  semester_id uuid not null references semesters(id) on delete restrict,
   name text not null,
   min_attendance_required int default 75,
+  status text check (status in ('active', 'inactive', 'archived')) default 'active',
   created_at timestamp default now()
 );
 

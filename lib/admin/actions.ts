@@ -59,9 +59,9 @@ export async function deleteSession(id: string) {
 }
 
 // ── Programs ────────────────────────────────────────────────────
-export async function createProgram(name: string) {
+export async function createProgram(name: string, session_id: string) {
   const supabase = await requireAdmin();
-  const { error } = await supabase.from("programs").insert({ name });
+  const { error } = await supabase.from("programs").insert({ name, session_id });
   if (error) return { error: error.message };
   revalidatePath("/admin/sessions");
   return { success: true };
