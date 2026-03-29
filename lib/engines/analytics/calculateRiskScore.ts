@@ -49,15 +49,3 @@ export function calculateRiskScore(
   return { riskScore: Math.min(100, riskScore), riskLevel: "danger" };
 }
 
-/**
- * riskLevel derive karne ka shortcut (score ke bina)
- */
-export function getRiskLevel(
-  attendancePercentage: number,
-  requiredPercentage: number,
-): "safe" | "warning" | "danger" {
-  const dangerLine = Math.max(0, requiredPercentage - 10);
-  if (attendancePercentage >= requiredPercentage) return "safe";
-  if (attendancePercentage >= dangerLine) return "warning";
-  return "danger";
-}

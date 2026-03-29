@@ -66,7 +66,7 @@ export async function getDailySchedule(
   const sessionIds = sessions.map((s) => s.id);
 
   // Attendance records fetch karo
-  let attendanceMap: Record<string, string> = {};
+  const attendanceMap: Record<string, string> = {};
   if (sessionIds.length > 0) {
     const { data: attendance } = await supabase
       .from("attendance")

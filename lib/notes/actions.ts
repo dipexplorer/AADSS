@@ -23,7 +23,7 @@ export async function getNoteForDate(studentId: string, _date: string) {
 export async function saveNoteForDate(
   studentId: string,
   _date: string,
-  content: any,
+  content: string,
 ) {
   const supabase = createClient();
 

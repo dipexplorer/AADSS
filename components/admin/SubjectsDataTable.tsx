@@ -70,7 +70,7 @@ export function SubjectsDataTable({ data, onEdit, onDelete }: Props) {
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <ChevronDown className="w-3 h-3 opacity-20" />;
     return sortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />;
   };
@@ -103,19 +103,19 @@ export function SubjectsDataTable({ data, onEdit, onDelete }: Props) {
                 className="px-6 py-3 font-medium cursor-pointer hover:bg-muted/60 transition-colors"
                 onClick={() => handleSort("code")}
               >
-                <div className="flex items-center gap-2">Code <SortIcon field="code" /></div>
+                <div className="flex items-center gap-2">Code {renderSortIcon("code")}</div>
               </th>
               <th 
                 className="px-6 py-3 font-medium cursor-pointer hover:bg-muted/60 transition-colors"
                 onClick={() => handleSort("name")}
               >
-                <div className="flex items-center gap-2">Subject Name <SortIcon field="name" /></div>
+                <div className="flex items-center gap-2">Subject Name {renderSortIcon("name")}</div>
               </th>
               <th 
                 className="px-6 py-3 font-medium cursor-pointer hover:bg-muted/60 transition-colors"
                 onClick={() => handleSort("credits")}
               >
-                <div className="flex items-center gap-2">Credits <SortIcon field="credits" /></div>
+                <div className="flex items-center gap-2">Credits {renderSortIcon("credits")}</div>
               </th>
               <th className="px-6 py-3 font-medium">Min Attendance</th>
               <th className="px-6 py-3 font-medium text-center">Status</th>
