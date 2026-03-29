@@ -120,15 +120,20 @@ export async function deleteSemester(id: string) {
 }
 
 // ── Subjects ────────────────────────────────────────────────────
-export async function createSubject(data: {
-  semester_id: string;
-  name: string;
-  min_attendance_required?: number;
-}) {
+export async function createSubject(
+  semester_id: string,
+  name: string,
+  code: string,
+  credits: number,
+  min_attendance_required: number
+) {
   const supabase = await requireAdmin();
   const { error } = await supabase.from("subjects").insert({
-    ...data,
-    min_attendance_required: data.min_attendance_required ?? 75,
+    semester_id,
+    name,
+    code,
+    credits,
+    min_attendance_required,
   });
   if (error) return { error: error.message };
   revalidatePath("/admin/subjects");
@@ -139,6 +144,8 @@ export async function updateSubject(
   id: string,
   data: {
     name?: string;
+    code?: string;
+    credits?: number;
     min_attendance_required?: number;
   },
 ) {

@@ -38,6 +38,8 @@ create table subjects (
   id uuid primary key default uuid_generate_v4(),
   semester_id uuid not null references semesters(id) on delete restrict,
   name text not null,
+  code text,
+  credits int default 3,
   min_attendance_required int default 75,
   status text check (status in ('active', 'inactive', 'archived')) default 'active',
   created_at timestamp default now()
