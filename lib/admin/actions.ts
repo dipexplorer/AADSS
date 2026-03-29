@@ -67,6 +67,14 @@ export async function createProgram(name: string) {
   return { success: true };
 }
 
+export async function updateProgram(id: string, name: string) {
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("programs").update({ name }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/sessions");
+  return { success: true };
+}
+
 export async function deleteProgram(id: string) {
   const supabase = await requireAdmin();
   const { error } = await supabase.from("programs").delete().eq("id", id);
@@ -84,6 +92,20 @@ export async function createSemester(
   const { error } = await supabase
     .from("semesters")
     .insert({ program_id, semester_number });
+  if (error) return { error: error.message };
+  revalidatePath("/admin/sessions");
+  return { success: true };
+}
+
+export async function updateSemester(
+  id: string,
+  data: {
+    program_id?: string;
+    semester_number?: number;
+  }
+) {
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("semesters").update(data).eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/admin/sessions");
   return { success: true };

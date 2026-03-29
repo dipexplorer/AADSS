@@ -8,8 +8,10 @@ import {
   updateSession,
   deleteSession,
   createProgram,
+  updateProgram,
   deleteProgram,
   createSemester,
+  updateSemester,
   deleteSemester,
 } from "@/lib/admin/actions";
 
@@ -37,6 +39,27 @@ export default function SessionsClient({
     start_date: "",
     end_date: "",
   });
+  const [editingSession, setEditingSession] = useState<string | null>(null);
+  const [editSessionForm, setEditSessionForm] = useState({
+    name: "",
+    start_date: "",
+    end_date: "",
+  });
+
+  function handleUpdateSession(id: string) {
+    if (!editSessionForm.name || !editSessionForm.start_date || !editSessionForm.end_date) {
+      toast.error("All fields required");
+      return;
+    }
+    startTransition(async () => {
+      const res = await updateSession(id, editSessionForm);
+      if (res?.error) toast.error(res.error);
+      else {
+        toast.success("Session updated");
+        setEditingSession(null);
+      }
+    });
+  }
 
   function handleCreateSession() {
     if (!sessionForm.name || !sessionForm.start_date || !sessionForm.end_date) {
@@ -55,6 +78,23 @@ export default function SessionsClient({
 
   // ── Program Form ──
   const [programName, setProgramName] = useState("");
+  const [editingProgram, setEditingProgram] = useState<string | null>(null);
+  const [editProgramName, setEditProgramName] = useState("");
+
+  function handleUpdateProgram(id: string) {
+    if (!editProgramName.trim()) {
+      toast.error("Program name required");
+      return;
+    }
+    startTransition(async () => {
+      const res = await updateProgram(id, editProgramName);
+      if (res?.error) toast.error(res.error);
+      else {
+        toast.success("Program updated");
+        setEditingProgram(null);
+      }
+    });
+  }
 
   function handleCreateProgram() {
     if (!programName.trim()) {
@@ -76,6 +116,32 @@ export default function SessionsClient({
     program_id: "",
     semester_number: "",
   });
+  const [editingSemester, setEditingSemester] = useState<string | null>(null);
+  const [editSemesterForm, setEditSemesterForm] = useState({
+    program_id: "",
+    semester_number: "",
+  });
+
+  function handleUpdateSemester(id: string) {
+    if (!editSemesterForm.program_id || !editSemesterForm.semester_number) {
+      toast.error("All fields required");
+      return;
+    }
+    startTransition(async () => {
+      const res = await updateSemester(
+        id,
+        {
+          program_id: editSemesterForm.program_id,
+          semester_number: Number(editSemesterForm.semester_number),
+        }
+      );
+      if (res?.error) toast.error(res.error);
+      else {
+        toast.success("Semester updated");
+        setEditingSemester(null);
+      }
+    });
+  }
 
   function handleCreateSemester() {
     if (!semesterForm.program_id || !semesterForm.semester_number) {
@@ -183,30 +249,89 @@ export default function SessionsClient({
               <tbody className="divide-y divide-border/50">
                 {sessions.map((s) => (
                   <tr key={s.id} className="hover:bg-muted/20">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {s.name}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {s.start_date}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {s.end_date}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() =>
-                          startTransition(async () => {
-                            if (!confirm("Delete this session?")) return;
-                            const res = await deleteSession(s.id);
-                            if (res?.error) toast.error(res.error);
-                            else toast.success("Deleted");
-                          })
-                        }
-                        className="text-red-500 hover:text-red-700 text-xs font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    {editingSession === s.id ? (
+                      <>
+                        <td className="px-4 py-3">
+                          <input
+                            value={editSessionForm.name}
+                            onChange={(e) => setEditSessionForm({ ...editSessionForm, name: e.target.value })}
+                            className="w-full px-2 py-1 border border-border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="date"
+                            value={editSessionForm.start_date}
+                            onChange={(e) => setEditSessionForm({ ...editSessionForm, start_date: e.target.value })}
+                            className="w-full px-2 py-1 border border-border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="date"
+                            value={editSessionForm.end_date}
+                            onChange={(e) => setEditSessionForm({ ...editSessionForm, end_date: e.target.value })}
+                            className="w-full px-2 py-1 border border-border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-3">
+                          <button
+                            onClick={() => handleUpdateSession(s.id)}
+                            disabled={isPending}
+                            className="text-green-600 hover:text-green-700 text-xs font-medium"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingSession(null)}
+                            disabled={isPending}
+                            className="text-muted-foreground hover:text-foreground text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {s.name}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {s.start_date}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {s.end_date}
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-3">
+                          <button
+                            onClick={() => {
+                              setEditingSession(s.id);
+                              setEditSessionForm({
+                                name: s.name,
+                                start_date: s.start_date,
+                                end_date: s.end_date,
+                              });
+                            }}
+                            className="text-blue-500 hover:text-blue-700 text-xs font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() =>
+                              startTransition(async () => {
+                                if (!confirm("Delete this session?")) return;
+                                const res = await deleteSession(s.id);
+                                if (res?.error) toast.error(res.error);
+                                else toast.success("Deleted");
+                              })
+                            }
+                            className="text-red-500 hover:text-red-700 text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
                 {sessions.length === 0 && (
@@ -262,24 +387,63 @@ export default function SessionsClient({
               <tbody className="divide-y divide-border/50">
                 {programs.map((p) => (
                   <tr key={p.id} className="hover:bg-muted/20">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {p.name}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() =>
-                          startTransition(async () => {
-                            if (!confirm("Delete this program?")) return;
-                            const res = await deleteProgram(p.id);
-                            if (res?.error) toast.error(res.error);
-                            else toast.success("Deleted");
-                          })
-                        }
-                        className="text-red-500 hover:text-red-700 text-xs font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    {editingProgram === p.id ? (
+                      <>
+                        <td className="px-4 py-3">
+                          <input
+                            value={editProgramName}
+                            onChange={(e) => setEditProgramName(e.target.value)}
+                            className="w-full px-2 py-1 border border-border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-3">
+                          <button
+                            onClick={() => handleUpdateProgram(p.id)}
+                            disabled={isPending}
+                            className="text-green-600 hover:text-green-700 text-xs font-medium"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingProgram(null)}
+                            disabled={isPending}
+                            className="text-muted-foreground hover:text-foreground text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {p.name}
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-3">
+                          <button
+                            onClick={() => {
+                              setEditingProgram(p.id);
+                              setEditProgramName(p.name);
+                            }}
+                            className="text-blue-500 hover:text-blue-700 text-xs font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() =>
+                              startTransition(async () => {
+                                if (!confirm("Delete this program?")) return;
+                                const res = await deleteProgram(p.id);
+                                if (res?.error) toast.error(res.error);
+                                else toast.success("Deleted");
+                              })
+                            }
+                            className="text-red-500 hover:text-red-700 text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
                 {programs.length === 0 && (
@@ -363,27 +527,96 @@ export default function SessionsClient({
               <tbody className="divide-y divide-border/50">
                 {semesters.map((s) => (
                   <tr key={s.id} className="hover:bg-muted/20">
-                    <td className="px-4 py-3 text-foreground">
-                      {(s.programs as any)?.name}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">
-                      Semester {s.semester_number}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() =>
-                          startTransition(async () => {
-                            if (!confirm("Delete?")) return;
-                            const res = await deleteSemester(s.id);
-                            if (res?.error) toast.error(res.error);
-                            else toast.success("Deleted");
-                          })
-                        }
-                        className="text-red-500 hover:text-red-700 text-xs font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
+                    {editingSemester === s.id ? (
+                      <>
+                        <td className="px-4 py-3">
+                          <select
+                            value={editSemesterForm.program_id}
+                            onChange={(e) =>
+                              setEditSemesterForm({
+                                ...editSemesterForm,
+                                program_id: e.target.value,
+                              })
+                            }
+                            className="w-full px-2 py-1 border border-border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                          >
+                            <option value="">Select Program</option>
+                            {programs.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            min={1}
+                            max={8}
+                            value={editSemesterForm.semester_number}
+                            onChange={(e) =>
+                              setEditSemesterForm({
+                                ...editSemesterForm,
+                                semester_number: e.target.value,
+                              })
+                            }
+                            className="w-full px-2 py-1 border border-border rounded text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-3">
+                          <button
+                            onClick={() => handleUpdateSemester(s.id)}
+                            disabled={isPending}
+                            className="text-green-600 hover:text-green-700 text-xs font-medium"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingSemester(null)}
+                            disabled={isPending}
+                            className="text-muted-foreground hover:text-foreground text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 text-foreground">
+                          {(s.programs as any)?.name}
+                        </td>
+                        <td className="px-4 py-3 text-foreground">
+                          Semester {s.semester_number}
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-3">
+                          <button
+                            onClick={() => {
+                              setEditingSemester(s.id);
+                              setEditSemesterForm({
+                                program_id: s.program_id,
+                                semester_number: String(s.semester_number),
+                              });
+                            }}
+                            className="text-blue-500 hover:text-blue-700 text-xs font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() =>
+                              startTransition(async () => {
+                                if (!confirm("Delete?")) return;
+                                const res = await deleteSemester(s.id);
+                                if (res?.error) toast.error(res.error);
+                                else toast.success("Deleted");
+                              })
+                            }
+                            className="text-red-500 hover:text-red-700 text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
                 {semesters.length === 0 && (
