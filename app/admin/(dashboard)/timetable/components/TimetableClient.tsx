@@ -121,7 +121,7 @@ export default function TimetableClient({ slots, subjects }: Props) {
   };
 
   return (
-    <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col p-4 md:p-6 gap-6 max-w-[1600px] mx-auto overflow-hidden">
+    <div className="h-[calc(100vh-(--spacing(16)))] flex flex-col p-4 md:p-6 gap-6 max-w-[1600px] mx-auto overflow-hidden">
       {/* Header & Global Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
         <div>
@@ -161,7 +161,7 @@ export default function TimetableClient({ slots, subjects }: Props) {
       {/* Split Workspace */}
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
         {/* Left Sidebar: Staging & Forms */}
-        <div className="w-80 shrink-0 bg-card border rounded-xl flex flex-col overflow-hidden shadow-sm hidden lg:flex">
+        <div className="w-80 shrink-0 bg-card border rounded-xl flex-col overflow-hidden shadow-sm hidden lg:flex">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold text-foreground flex items-center gap-2">
               <Move className="w-4 h-4" /> Scheduling Bucket
@@ -174,7 +174,9 @@ export default function TimetableClient({ slots, subjects }: Props) {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {/* Draggable Subject Cards representing active semester subjects */}
             {subjects.map((sub) => {
-              const mappedCount = slots.filter((s) => s.subject_id === sub.id).length;
+              const mappedCount = slots.filter(
+                (s) => s.subject_id === sub.id,
+              ).length;
               const requiredCount = sub.credits || 3; // Fallback to 3 if credits not defined
               const isFulfilled = mappedCount >= requiredCount;
 
@@ -182,22 +184,24 @@ export default function TimetableClient({ slots, subjects }: Props) {
                 <div
                   key={sub.id}
                   className={`p-3 border rounded-lg cursor-grab active:cursor-grabbing group transition-all ${
-                    isFulfilled 
-                      ? "bg-primary/5 border-primary/30" 
+                    isFulfilled
+                      ? "bg-primary/5 border-primary/30"
                       : "bg-background hover:border-primary/50"
                   }`}
                 >
                   <div className="flex justify-between items-start mb-1">
                     <div className="flex items-center gap-2">
                       <GripVertical className="w-4 h-4 text-muted-foreground opacity-50 group-hover:opacity-100" />
-                      <span className={`font-semibold text-sm ${isFulfilled ? "text-primary" : "text-foreground"}`}>
+                      <span
+                        className={`font-semibold text-sm ${isFulfilled ? "text-primary" : "text-foreground"}`}
+                      >
                         {sub.name}
                       </span>
                     </div>
-                    <span 
+                    <span
                       className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                        isFulfilled 
-                          ? "bg-primary/20 text-primary font-bold" 
+                        isFulfilled
+                          ? "bg-primary/20 text-primary font-bold"
                           : "bg-primary/10 text-primary"
                       }`}
                     >
@@ -205,7 +209,8 @@ export default function TimetableClient({ slots, subjects }: Props) {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground ml-6">
-                    {sub.code ? `${sub.code}` : 'Subject'} • {requiredCount} Credits
+                    {sub.code ? `${sub.code}` : "Subject"} • {requiredCount}{" "}
+                    Credits
                   </p>
                 </div>
               );
@@ -507,59 +512,89 @@ export default function TimetableClient({ slots, subjects }: Props) {
             <div className="p-5 border-b border-border/50">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-bold text-foreground">{(selectedSlot.subjects as any)?.name}</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Detailed Slot Information</p>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {(selectedSlot.subjects as any)?.name}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Detailed Slot Information
+                  </p>
                 </div>
-                <button onClick={() => setSelectedSlot(null)} className="text-muted-foreground hover:text-foreground">
+                <button
+                  onClick={() => setSelectedSlot(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <Maximize2 className="w-5 h-5 rotate-45" />
                 </button>
               </div>
             </div>
-            
+
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Schedule</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Schedule
+                  </span>
                   <div className="mt-1 flex items-center gap-2 text-foreground font-medium">
-                    <Calendar className="w-4 h-4 text-primary" /> {DAYS[selectedSlot.day_of_week]}
+                    <Calendar className="w-4 h-4 text-primary" />{" "}
+                    {DAYS[selectedSlot.day_of_week]}
                   </div>
                   <div className="mt-1 flex items-center gap-2 text-foreground font-medium">
-                    <Clock className="w-4 h-4 text-primary" /> {selectedSlot.start_time.slice(0, 5)} – {selectedSlot.end_time.slice(0, 5)}
+                    <Clock className="w-4 h-4 text-primary" />{" "}
+                    {selectedSlot.start_time.slice(0, 5)} –{" "}
+                    {selectedSlot.end_time.slice(0, 5)}
                   </div>
                 </div>
-                
+
                 <div>
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Room Allocation</span>
-                  <div className="mt-1 text-foreground font-medium">{selectedSlot.room || "Not Assigned"}</div>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Room Allocation
+                  </span>
+                  <div className="mt-1 text-foreground font-medium">
+                    {selectedSlot.room || "Not Assigned"}
+                  </div>
                 </div>
               </div>
-              
+
               <div className="pt-4 border-t border-border/50">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Geo-Fencing Data</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Geo-Fencing Data
+                </span>
                 {selectedSlot.latitude && selectedSlot.longitude ? (
                   <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-muted-foreground block text-xs">Latitude</span>
+                      <span className="text-muted-foreground block text-xs">
+                        Latitude
+                      </span>
                       <span className="font-mono">{selectedSlot.latitude}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-xs">Longitude</span>
-                      <span className="font-mono">{selectedSlot.longitude}</span>
+                      <span className="text-muted-foreground block text-xs">
+                        Longitude
+                      </span>
+                      <span className="font-mono">
+                        {selectedSlot.longitude}
+                      </span>
                     </div>
                     <div className="col-span-2">
-                      <span className="text-muted-foreground block text-xs">Allowed Radius</span>
-                      <span className="font-mono">{selectedSlot.allowed_radius} meters</span>
+                      <span className="text-muted-foreground block text-xs">
+                        Allowed Radius
+                      </span>
+                      <span className="font-mono">
+                        {selectedSlot.allowed_radius} meters
+                      </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-2 text-sm text-muted-foreground italic">No geographic restrictions applied.</div>
+                  <div className="mt-2 text-sm text-muted-foreground italic">
+                    No geographic restrictions applied.
+                  </div>
                 )}
               </div>
             </div>
-            
+
             <div className="p-4 bg-muted/30 border-t border-border/50 flex justify-end">
-              <button 
-                onClick={() => setSelectedSlot(null)} 
+              <button
+                onClick={() => setSelectedSlot(null)}
                 className="px-5 py-2 bg-secondary text-secondary-foreground font-medium rounded-lg text-sm hover:bg-secondary/80 transition"
               >
                 Close View
@@ -568,7 +603,6 @@ export default function TimetableClient({ slots, subjects }: Props) {
           </div>
         </div>
       )}
-
     </div>
   );
 }

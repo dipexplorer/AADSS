@@ -7,12 +7,10 @@ import {
   Users, 
   GraduationCap,
   TrendingDown,
-  TrendingUp,
   Activity,
   CheckCircle2,
   Clock,
-  ArrowRight,
-  Plus
+  ArrowRight
 } from "lucide-react";
 
 export default async function AdminDashboardPage() {
@@ -33,7 +31,7 @@ export default async function AdminDashboardPage() {
       .select("*", { count: "exact", head: true })
       .gte("date", new Date().toISOString().split("T")[0]),
     supabase.from("class_sessions")
-      .select("id, status, start_time, end_time, session_type")
+      .select("id, status, start_time, end_time, subjects(name)")
       .eq("date", new Date().toISOString().split("T")[0])
       .limit(5)
   ]);
@@ -146,7 +144,7 @@ export default async function AdminDashboardPage() {
         {/* Section D: Today's Pulse */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Today's Pulse</h2>
+            <h2 className="text-lg font-semibold text-foreground">Today&apos;s Pulse</h2>
             <Link href="/admin/timetable" className="text-sm text-primary hover:underline flex items-center gap-1">
               View Full Timetable <ArrowRight className="w-4 h-4" />
             </Link>
@@ -160,7 +158,7 @@ export default async function AdminDashboardPage() {
                       <Clock className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">{cls.session_type || 'Regular Class'}</p>
+                      <p className="font-medium text-foreground">{(cls.subjects as { name: string } | null)?.name || 'Regular Class'}</p>
                       <p className="text-sm text-muted-foreground">
                         {cls.start_time} - {cls.end_time}
                       </p>
@@ -213,7 +211,7 @@ export default async function AdminDashboardPage() {
 
           {/* System Health / Data Completeness Hook */}
           <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4">
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
               <Activity className="w-4 h-4" /> System Health
             </h2>
             <div className="space-y-3">
