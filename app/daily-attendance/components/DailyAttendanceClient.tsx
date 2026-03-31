@@ -7,10 +7,7 @@ import {
   getDailySchedule,
   ClassPeriod,
 } from "@/lib/attendance/getDailySchedule";
-import {
-  markAttendance,
-  clearAttendance,
-} from "@/lib/attendance/markAttendance";
+import { markAttendance } from "@/lib/attendance/markAttendance";
 import { toast } from "react-hot-toast";
 import DateNavigator from "@/app/daily-attendance/components/DateNavigator";
 import ScheduleTimeline from "@/app/daily-attendance/components/ScheduleTimeline";
@@ -73,88 +70,70 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
     router.push(`/daily-attendance?date=${newDate}`, { scroll: false });
   }
 
-  function handleStatusChange(
-    sessionId: string,
-    status: "present" | "absent" | "cancelled" | null,
-  ) {
+  /**
+   * Students can only mark themselves PRESENT.
+   * Absent and cancelled are handled by system/admin.
+   * Location is fetched here for geo-fence validation.
+   */
+  function handleMarkPresent(sessionId: string, status: "present") {
     // Optimistic update
     setPeriods((prev) =>
       prev.map((p) =>
-        p.sessionId === sessionId ? { ...p, attendanceStatus: status } : p,
+        p.sessionId === sessionId ? { ...p, attendanceStatus: "present" } : p,
       ),
     );
 
     startTransition(async () => {
       try {
-        if (status === null) {
-          const { error } = await clearAttendance(sessionId, profile.id);
-          if (error) {
-            toast.error(error);
-            // Revert
-            setPeriods((prev) =>
-              prev.map((p) =>
-                p.sessionId === sessionId
-                  ? { ...p, attendanceStatus: null }
-                  : p,
-              ),
-            );
-          }
-        } else {
-          // Fetch geolocation if marking as present
-          let userLocation: GeoLocation | undefined;
-          if (status === "present") {
-            try {
-              userLocation = await new Promise<GeoLocation>((resolve, reject) => {
-                if (!navigator.geolocation) {
-                  return reject(new Error("Geolocation not supported"));
-                }
-                navigator.geolocation.getCurrentPosition(
-                  (pos) =>
-                    resolve({
-                      latitude: pos.coords.latitude,
-                      longitude: pos.coords.longitude,
-                      accuracy: pos.coords.accuracy,
-                    }),
-                  (err) => reject(err),
-                  { enableHighAccuracy: true, timeout: 10000 },
-                );
-              });
-            } catch (err) {
-              const errorMessage =
-                err instanceof Error ? err.message : "Location access denied";
-              toast.error(`Location required for attendance: ${errorMessage}`);
-              // Revert optimistic update
-              setPeriods((prev) =>
-                prev.map((p) =>
-                  p.sessionId === sessionId
-                    ? { ...p, attendanceStatus: null }
-                    : p,
-                ),
-              );
-              return;
+        // Attempt to fetch GPS location (best effort)
+        let userLocation: GeoLocation | undefined;
+        try {
+          userLocation = await new Promise<GeoLocation>((resolve, reject) => {
+            if (!navigator.geolocation) {
+              return reject(new Error("Geolocation not supported"));
             }
-          }
-
-          const result = await markAttendance(
-            sessionId,
-            profile.id,
-            status,
-            userLocation,
-          );
-          if (result.error) {
-            toast.error(result.error);
-            // Revert
-            setPeriods((prev) =>
-              prev.map((p) =>
-                p.sessionId === sessionId
-                  ? { ...p, attendanceStatus: null }
-                  : p,
-              ),
+            navigator.geolocation.getCurrentPosition(
+              (pos) =>
+                resolve({
+                  latitude: pos.coords.latitude,
+                  longitude: pos.coords.longitude,
+                  accuracy: pos.coords.accuracy,
+                }),
+              (err) => reject(err),
+              { enableHighAccuracy: true, timeout: 10000 },
             );
-          }
+          });
+        } catch {
+          // No location — server will decide if geo-fence is required
+        }
+
+        const result = await markAttendance(
+          sessionId,
+          profile.id,
+          "present",
+          userLocation,
+        );
+
+        if (result.error) {
+          toast.error(result.error);
+          // Revert optimistic update
+          setPeriods((prev) =>
+            prev.map((p) =>
+              p.sessionId === sessionId
+                ? { ...p, attendanceStatus: null }
+                : p,
+            ),
+          );
+        } else {
+          toast.success("Attendance marked — Present ✓");
         }
       } catch {
         toast.error("Something went wrong");
+        setPeriods((prev) =>
+          prev.map((p) =>
+            p.sessionId === sessionId ? { ...p, attendanceStatus: null } : p,
+          ),
+        );
       }
     });
   }
@@ -178,7 +157,7 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
           periods={periods}
           loading={loading}
           date={date}
-          onStatusChange={handleStatusChange}
+          onStatusChange={handleMarkPresent}
         />
 
         {/* Daily Notes Editor */}

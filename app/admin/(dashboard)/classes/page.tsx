@@ -13,9 +13,10 @@ export default async function AdminClassesPage({
 
   const { data: sessions } = await supabase
     .from("class_sessions")
-    .select("*, subjects(name, semesters(semester_number, programs(name)))")
+    .select("*, cancelled_at, cancelled_by, subjects(name, semesters(semester_number, programs(name)))")
     .eq("date", targetDate)
     .order("start_time");
+
 
   return (
     <ClassSessionsClient sessions={sessions ?? []} targetDate={targetDate} />

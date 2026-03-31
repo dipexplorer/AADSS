@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
+import { toast } from "react-hot-toast";
+import { overrideStudentAttendance } from "@/lib/admin/actions";
 import {
   Search,
   Filter,
@@ -191,6 +193,10 @@ function StudentRow({
   onToggle: () => void;
 }) {
   const { present, total } = s.attendance_metrics;
+  const [isPending, startTransition] = useTransition();
+  const [overrideSessionId, setOverrideSessionId] = useState("");
+  const [overrideStatus, setOverrideStatus] = useState<"present" | "absent">("present");
+  const [overrideReason, setOverrideReason] = useState("");
 
   const barColor =
     s.riskStatus === "safe" ? "bg-green-500" :
@@ -202,6 +208,28 @@ function StudentRow({
     s.riskStatus === "warning" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
     s.riskStatus === "critical" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
     "bg-muted text-muted-foreground";
+
+  function handleOverride() {
+    if (!overrideSessionId.trim()) {
+      toast.error("Enter a session ID");
+      return;
+    }
+    startTransition(async () => {
+      const res = await overrideStudentAttendance(
+        s.id,
+        overrideSessionId.trim(),
+        overrideStatus,
+        overrideReason || undefined,
+      );
+      if (res?.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(`Attendance overridden → ${overrideStatus}`);
+        setOverrideSessionId("");
+        setOverrideReason("");
+      }
+    });
+  }
 
   return (
     <>
@@ -265,19 +293,74 @@ function StudentRow({
         </td>
       </tr>
 
-      {/* Expanded: show real breakdown info */}
+      {/* Expanded panel */}
       {isExpanded && (
         <tr>
           <td colSpan={8} className="p-0 border-b bg-muted/5">
-            <div className="px-6 py-4 text-sm text-muted-foreground space-y-1">
-              <p className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Breakdown</p>
-              {s.user_info?.email && <p><span className="text-foreground font-medium">Email:</span> {s.user_info.email}</p>}
-              <p><span className="text-foreground font-medium">Profile ID:</span> <span className="font-mono text-xs">{s.id}</span></p>
-              <p><span className="text-foreground font-medium">User ID:</span> <span className="font-mono text-xs">{s.user_id}</span></p>
-              <p><span className="text-foreground font-medium">Classes Present:</span> {present}</p>
-              <p><span className="text-foreground font-medium">Total Classes:</span> {total}</p>
-              <p><span className="text-foreground font-medium">Attendance:</span> {s.riskStatus === "pending" ? "No data recorded" : `${s.pct}%`}</p>
-              <p><span className="text-foreground font-medium">Enrolled On:</span> {s.created_at ? new Date(s.created_at).toLocaleString() : "—"}</p>
+            <div className="px-6 py-4 space-y-4">
+
+              {/* Breakdown */}
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Breakdown</p>
+                {s.user_info?.email && <p><span className="text-foreground font-medium">Email:</span> {s.user_info.email}</p>}
+                <p><span className="text-foreground font-medium">Profile ID:</span> <span className="font-mono text-xs">{s.id}</span></p>
+                <p><span className="text-foreground font-medium">User ID:</span> <span className="font-mono text-xs">{s.user_id}</span></p>
+                <p><span className="text-foreground font-medium">Classes Present:</span> {present}</p>
+                <p><span className="text-foreground font-medium">Total Classes:</span> {total}</p>
+                <p><span className="text-foreground font-medium">Attendance:</span> {s.riskStatus === "pending" ? "No data recorded" : `${s.pct}%`}</p>
+                <p><span className="text-foreground font-medium">Enrolled On:</span> {s.created_at ? new Date(s.created_at).toLocaleString() : "—"}</p>
+              </div>
+
+              {/* Admin Override */}
+              <div className="border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-3">
+                  ⚠ Admin Override Attendance
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="block text-xs text-muted-foreground mb-1">Class Session ID</label>
+                    <input
+                      type="text"
+                      placeholder="Paste session UUID..."
+                      value={overrideSessionId}
+                      onChange={(e) => setOverrideSessionId(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-border rounded-md text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Status</label>
+                    <select
+                      value={overrideStatus}
+                      onChange={(e) => setOverrideStatus(e.target.value as "present" | "absent")}
+                      className="px-2 py-1.5 border border-border rounded-md text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="present">Present</option>
+                      <option value="absent">Absent</option>
+                    </select>
+                  </div>
+                  <div className="flex-1 min-w-[140px]">
+                    <label className="block text-xs text-muted-foreground mb-1">Reason (optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Medical leave"
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-border rounded-md text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <button
+                    onClick={handleOverride}
+                    disabled={isPending || !overrideSessionId.trim()}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-semibold disabled:opacity-50 transition-colors"
+                  >
+                    {isPending ? "Saving..." : "Apply Override"}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  This will upsert the attendance record and log your user ID as the override source.
+                </p>
+              </div>
+
             </div>
           </td>
         </tr>

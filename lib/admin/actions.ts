@@ -244,3 +244,101 @@ export async function rescheduleClassSession(
   revalidatePath("/admin/classes");
   return { success: true };
 }
+
+// ── Attendance Management ────────────────────────────────────────
+
+/**
+ * Admin cancels a class session and cascades "cancelled" attendance
+ * to every enrolled student in the semester.
+ */
+export async function cancelClassAndCascade(classSessionId: string) {
+  const supabase = await requireAdmin();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: session, error: sessionErr } = await supabase
+    .from("class_sessions")
+    .select("id, subject_id, status, subjects(semester_id)")
+    .eq("id", classSessionId)
+    .single();
+
+  if (sessionErr || !session) return { error: "Session not found" };
+  if (session.status === "cancelled") return { error: "Already cancelled" };
+
+  const subjectData = session.subjects as unknown as { semester_id: string } | null;
+  if (!subjectData?.semester_id) return { error: "Semester not found for session" };
+  const semesterId = subjectData.semester_id;
+
+  const { error: cancelErr } = await supabase
+    .from("class_sessions")
+    .update({
+      status: "cancelled",
+      cancelled_by: user?.id,
+      cancelled_at: new Date().toISOString(),
+    })
+    .eq("id", classSessionId);
+
+  if (cancelErr) return { error: cancelErr.message };
+
+  const { data: students, error: studentsErr } = await supabase
+    .from("student_profiles")
+    .select("id")
+    .eq("semester_id", semesterId);
+
+  if (studentsErr) return { error: studentsErr.message };
+  if (!students || students.length === 0) {
+    revalidatePath("/admin/classes");
+    return { success: true, cascaded: 0 };
+  }
+
+  const attendanceRows = students.map((s) => ({
+    student_id: s.id,
+    class_session_id: classSessionId,
+    status: "cancelled" as const,
+    marked_at: new Date().toISOString(),
+  }));
+
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < attendanceRows.length; i += CHUNK_SIZE) {
+    const chunk = attendanceRows.slice(i, i + CHUNK_SIZE);
+    const { error } = await supabase
+      .from("attendance")
+      .upsert(chunk, { onConflict: "student_id,class_session_id" });
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/admin/classes");
+  revalidatePath("/admin/students");
+  return { success: true, cascaded: students.length };
+}
+
+/**
+ * Admin manually overrides a student's attendance (present ↔ absent).
+ * Records who overrode and optionally why — for the audit log.
+ */
+export async function overrideStudentAttendance(
+  studentProfileId: string,
+  classSessionId: string,
+  status: "present" | "absent",
+  reason?: string,
+) {
+  const supabase = await requireAdmin();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { error } = await supabase.from("attendance").upsert(
+    {
+      student_id: studentProfileId,
+      class_session_id: classSessionId,
+      status,
+      marked_at: new Date().toISOString(),
+      overridden_by: user?.id,
+      override_reason: reason ?? null,
+    },
+    { onConflict: "student_id,class_session_id" },
+  );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/students");
+  revalidatePath("/admin/classes");
+  return { success: true };
+}

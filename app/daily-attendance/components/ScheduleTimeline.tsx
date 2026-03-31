@@ -3,7 +3,7 @@
 
 import { ClassPeriod } from "@/lib/attendance/getDailySchedule";
 import type { GeoLocation } from "@/lib/engines/validation/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface ScheduleTimelineProps {
   periods: ClassPeriod[];
@@ -11,13 +11,28 @@ interface ScheduleTimelineProps {
   date: string;
   onStatusChange: (
     sessionId: string,
-    status: "present" | "absent" | "cancelled" | null,
+    status: "present",
   ) => void;
 }
 
-function isWeekend(dateStr: string): boolean {
-  const d = new Date(dateStr + "T00:00:00").getDay();
-  return d === 0 || d === 6;
+const WINDOW_MINUTES = 10; // must match server-side window
+
+type WindowState = "before" | "open" | "closed";
+
+function getWindowState(
+  dateStr: string,
+  startTime: string,
+  now: Date,
+): WindowState {
+  const [h, m, s] = startTime.split(":").map(Number);
+  const classStart = new Date(`${dateStr}T00:00:00`);
+  classStart.setHours(h, m, s ?? 0, 0);
+
+  const windowEnd = new Date(classStart.getTime() + WINDOW_MINUTES * 60 * 1000);
+
+  if (now < classStart) return "before";
+  if (now <= windowEnd) return "open";
+  return "closed";
 }
 
 function formatTime(time: string): string {
@@ -28,12 +43,36 @@ function formatTime(time: string): string {
   return `${displayHour}:${m} ${ampm}`;
 }
 
+function isWeekend(dateStr: string): boolean {
+  const d = new Date(dateStr + "T00:00:00").getDay();
+  return d === 0 || d === 6;
+}
+
+// Countdown helper: returns "2:45" format
+function formatCountdown(dateStr: string, startTime: string, now: Date): string {
+  const [h, m, s] = startTime.split(":").map(Number);
+  const classStart = new Date(`${dateStr}T00:00:00`);
+  classStart.setHours(h, m, s ?? 0, 0);
+  const diff = Math.max(0, Math.floor((classStart.getTime() - now.getTime()) / 1000));
+  const mins = Math.floor(diff / 60);
+  const secs = diff % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
 export default function ScheduleTimeline({
   periods,
   loading,
   date,
   onStatusChange,
 }: ScheduleTimelineProps) {
+  const [now, setNow] = useState(new Date());
+
+  // Tick every second to update time-window states
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -102,7 +141,9 @@ export default function ScheduleTimeline({
           key={period.sessionId}
           period={period}
           periodNumber={index + 1}
-          onStatusChange={onStatusChange}
+          date={date}
+          now={now}
+          onMarkPresent={() => onStatusChange(period.sessionId, "present")}
         />
       ))}
     </div>
@@ -112,52 +153,56 @@ export default function ScheduleTimeline({
 function PeriodCard({
   period,
   periodNumber,
-  onStatusChange,
+  date,
+  now,
+  onMarkPresent,
 }: {
   period: ClassPeriod;
   periodNumber: number;
-  onStatusChange: (
-    sessionId: string,
-    status: "present" | "absent" | "cancelled" | null,
-    location?: GeoLocation,
-  ) => void;
+  date: string;
+  now: Date;
+  onMarkPresent: () => void;
 }) {
   const [locating, setLocating] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
 
-  const status = period.attendanceStatus;
   const isCancelled = period.status === "cancelled";
+  const isCompleted = period.status === "completed";
+  const attendanceStatus = period.attendanceStatus;
+
+  // Time window state (only relevant for scheduled sessions)
+  const windowState: WindowState =
+    isCancelled || isCompleted
+      ? "closed"
+      : getWindowState(date, period.startTime, now);
+
+  const isToday = date === new Date().toISOString().split("T")[0];
+  // For past dates, always show closed if no attendance
+  const effectiveWindowState =
+    !isToday && windowState !== "closed" ? "closed" : windowState;
+
+  // Border accent
+  const borderColor =
+    isCancelled
+      ? "border-l-yellow-400"
+      : attendanceStatus === "present"
+        ? "border-l-green-500"
+        : attendanceStatus === "absent"
+          ? "border-l-red-400"
+          : effectiveWindowState === "open"
+            ? "border-l-blue-500"
+            : "border-l-transparent";
 
   async function handlePresentClick() {
-    if (status === "present") {
-      onStatusChange(period.sessionId, null);
-      return;
-    }
-
-    setLocationError(null);
     setLocating(true);
-
     try {
-      const geoLocation = await getCurrentLocation();
-      onStatusChange(period.sessionId, "present", geoLocation);
-    } catch (err: any) {
-      // Location denied ya unavailable — try without location
-      // Server side pe timetable mein coordinates check hoga
-      console.warn("Location unavailable:", err.message);
-      onStatusChange(period.sessionId, "present", undefined);
+      await getCurrentLocation(); // just to confirm location works
+    } catch {
+      // silently continue — server validates
     } finally {
       setLocating(false);
     }
+    onMarkPresent();
   }
-
-  const borderColor =
-    status === "present"
-      ? "border-l-green-500"
-      : status === "absent"
-        ? "border-l-red-400"
-        : status === "cancelled"
-          ? "border-l-yellow-500"
-          : "border-l-transparent";
 
   return (
     <div
@@ -169,9 +214,7 @@ function PeriodCard({
           <span className="text-[10px] uppercase text-primary/60 font-bold tracking-wider">
             Period
           </span>
-          <span className="text-2xl font-bold text-primary">
-            {periodNumber}
-          </span>
+          <span className="text-2xl font-bold text-primary">{periodNumber}</span>
         </div>
 
         {/* Subject Info */}
@@ -181,168 +224,105 @@ function PeriodCard({
           </h3>
           <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-muted-foreground mt-1">
             <span className="flex items-center gap-1">
-              <svg
-                className="w-3.5 h-3.5 text-primary/70"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+              <svg className="w-3.5 h-3.5 text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               {formatTime(period.startTime)} — {formatTime(period.endTime)}
             </span>
             {period.room && (
               <span className="flex items-center gap-1">
-                <svg
-                  className="w-3.5 h-3.5 text-primary/70"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
+                <svg className="w-3.5 h-3.5 text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 {period.room}
               </span>
             )}
           </div>
-          {/* Location error message */}
-          {locationError && (
-            <p className="text-xs text-red-500 mt-1">{locationError}</p>
-          )}
         </div>
 
-        {/* Action Buttons */}
-        {isCancelled ? (
-          <div className="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg text-sm font-semibold">
-            Class Cancelled
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Present */}
-            <button
-              onClick={handlePresentClick}
-              disabled={locating}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 disabled:opacity-60 ${
-                status === "present"
-                  ? "bg-green-600 text-white shadow-sm ring-2 ring-green-500 ring-offset-2 ring-offset-card"
-                  : "text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30"
-              }`}
-            >
-              {locating ? (
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              )}
-              {locating ? "Locating..." : "Present"}
-            </button>
+        {/* Right side — action area */}
+        <div className="shrink-0 flex flex-col items-end gap-1.5 min-w-[140px]">
+          {/* ── CANCELLED ── */}
+          {isCancelled && (
+            <span className="px-3 py-1.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400 rounded-lg text-sm font-semibold">
+              🚫 Class Cancelled
+            </span>
+          )}
 
-            {/* Absent */}
-            <button
-              onClick={() =>
-                onStatusChange(
-                  period.sessionId,
-                  status === "absent" ? null : "absent",
-                )
-              }
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                status === "absent"
-                  ? "bg-red-500 text-white shadow-sm ring-2 ring-red-400 ring-offset-2 ring-offset-card"
-                  : "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-              }`}
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
+          {/* ── ALREADY MARKED ── */}
+          {!isCancelled && attendanceStatus === "present" && (
+            <span className="px-3 py-1.5 bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Present ✓
+            </span>
+          )}
+
+          {!isCancelled && attendanceStatus === "absent" && (
+            <span className="px-3 py-1.5 bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
               Absent
-            </button>
+            </span>
+          )}
 
-            {/* Cancelled */}
-            <button
-              onClick={() =>
-                onStatusChange(
-                  period.sessionId,
-                  status === "cancelled" ? null : "cancelled",
-                )
-              }
-              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                status === "cancelled"
-                  ? "bg-yellow-500 text-white shadow-sm ring-2 ring-yellow-400 ring-offset-2 ring-offset-card"
-                  : "text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-950/30"
-              }`}
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M20 12H4"
-                />
-              </svg>
-              <span className="hidden sm:inline">Cancel</span>
-            </button>
-          </div>
-        )}
+          {/* ── NO ATTENDANCE YET ── */}
+          {!isCancelled && !attendanceStatus && (
+            <>
+              {effectiveWindowState === "before" && (
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground mb-1">Starts in</div>
+                  <div className="tabular-nums font-mono text-sm font-semibold text-primary">
+                    {formatCountdown(date, period.startTime, now)}
+                  </div>
+                  <button
+                    disabled
+                    className="mt-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-muted/40 text-muted-foreground cursor-not-allowed"
+                  >
+                    Mark Present
+                  </button>
+                </div>
+              )}
+
+              {effectiveWindowState === "open" && (
+                <div className="text-right">
+                  <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1 flex items-center gap-1 justify-end">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
+                    Window open
+                  </div>
+                  <button
+                    onClick={handlePresentClick}
+                    disabled={locating}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                  >
+                    {locating ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                    {locating ? "Locating..." : "Mark Present"}
+                  </button>
+                </div>
+              )}
+
+              {effectiveWindowState === "closed" && (
+                <div className="text-right">
+                  <span className="px-3 py-1.5 bg-muted/50 text-muted-foreground rounded-lg text-sm font-medium inline-block">
+                    {isCompleted ? "Absent (window closed)" : "Window Closed"}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -355,23 +335,15 @@ function getCurrentLocation(): Promise<GeoLocation> {
       reject(new Error("Geolocation not supported"));
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      (pos) =>
         resolve({
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
-        });
-      },
-      (err) => {
-        reject(new Error(err.message));
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      },
+        }),
+      (err) => reject(new Error(err.message)),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   });
 }

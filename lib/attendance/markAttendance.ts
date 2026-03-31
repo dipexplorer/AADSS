@@ -13,41 +13,36 @@ export interface MarkAttendanceResult {
 }
 
 /**
- * Present mark karne ka flow:
+ * Student self-mark flow (PRESENT only):
  *
- * 1. Session details fetch (start_time, date, lat/lon, radius)
- * 2. Existing attendance check (duplicate guard)
- * 3. Time window validate (10 min rule)
- * 4. Geo-fence validate (agar classroom coordinates hain)
- * 5. Upsert attendance with lat/lon
+ * 1. Validate status — students can ONLY mark "present". Any other status is rejected.
+ * 2. Session details fetch (start_time, date, status, lat/lon, radius)
+ * 3. Session status check — reject if session is cancelled
+ * 4. Existing attendance check (duplicate guard)
+ * 5. Time window validate (10 min rule)
+ * 6. Geo-fence validate (if classroom coordinates exist)
+ * 7. Upsert attendance with lat/lon
  *
- * Absent/Cancelled ke liye: validations skip, direct upsert
+ * absent / cancelled are ONLY set by the system or admin via dedicated functions.
  */
 export async function markAttendance(
   sessionId: string,
   studentProfileId: string,
-  status: "present" | "absent" | "cancelled",
+  status: "present",
   location?: GeoLocation,
 ): Promise<MarkAttendanceResult> {
   const supabase = createClient();
 
-  // Absent/Cancelled — no validation needed
+  // ── Guard: Students can ONLY mark themselves present ──────────────
+  // absent / cancelled are system/admin responsibilities.
   if (status !== "present") {
-    const { error } = await supabase.from("attendance").upsert(
-      {
-        class_session_id: sessionId,
-        student_id: studentProfileId,
-        status,
-        marked_at: new Date().toISOString(),
-      },
-      { onConflict: "student_id,class_session_id" },
-    );
-    return { error: error?.message ?? null };
+    return {
+      error: "You can only mark yourself as present.",
+      validationError: "INVALID_STATUS",
+    };
   }
 
-  // ── Present mark flow ──────────────────────────────────────────
-
-  // 1. Session details fetch
+  // ── 1. Session details fetch ──────────────────────────────────────
   const { data: session, error: sessionError } = await supabase
     .from("class_sessions")
     .select(
@@ -55,6 +50,7 @@ export async function markAttendance(
       id,
       date,
       start_time,
+      status,
       timetable (
         latitude,
         longitude,
@@ -69,7 +65,24 @@ export async function markAttendance(
     return { error: "Session not found", validationError: "SESSION_NOT_FOUND" };
   }
 
-  // 2. Existing attendance check
+  // ── 2. Session status check ───────────────────────────────────────
+  // If the class was cancelled by admin, attendance cannot be marked.
+  if (session.status === "cancelled") {
+    return {
+      error: "This class has been cancelled. Attendance cannot be marked.",
+      validationError: "SESSION_CANCELLED",
+    };
+  }
+
+  if (session.status === "completed") {
+    return {
+      error:
+        "This class has already ended. The attendance window is closed.",
+      validationError: "SESSION_COMPLETED",
+    };
+  }
+
+  // ── 3. Duplicate check ────────────────────────────────────────────
   const { data: existing } = await supabase
     .from("attendance")
     .select("status")
@@ -82,12 +95,12 @@ export async function markAttendance(
   );
   if (!duplicateCheck.valid) {
     return {
-      error: "Already marked as present",
+      error: "You have already marked attendance for this class.",
       validationError: duplicateCheck.error,
     };
   }
 
-  // 3. Time window validation
+  // ── 4. Time window validation ─────────────────────────────────────
   const timingCheck = validateAttendanceTiming(
     session.date,
     session.start_time,
@@ -104,13 +117,14 @@ export async function markAttendance(
     };
   }
 
-  // 4. Geo-fence validation (only if classroom has coordinates)
+  // ── 5. Geo-fence validation (only if classroom has coordinates) ────
   const timetable = session.timetable as unknown as {
     latitude?: number;
     longitude?: number;
     allowed_radius?: number;
     room?: string;
   } | null;
+
   if (
     timetable?.latitude &&
     timetable?.longitude &&
@@ -138,7 +152,7 @@ export async function markAttendance(
     }
   }
 
-  // 5. All checks passed — upsert
+  // ── 6. All checks passed — upsert ─────────────────────────────────
   const { error } = await supabase.from("attendance").upsert(
     {
       class_session_id: sessionId,

@@ -4,6 +4,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { generateClassSessionsForDate } from "./generateClassSessions";
 import { autoCompletePastSessions } from "./autoCompleteSession";
+import { autoMarkAbsentForCompletedSessions } from "./autoMarkAbsent";
 
 export interface ClassPeriod {
   sessionId: string;
@@ -30,11 +31,13 @@ export async function getDailySchedule(
     return { data: [], error: null };
   }
 
-  // Auto-generate sessions agar exist nahi karte + auto-complete past sessions
+  // Auto-generate sessions + auto-complete ended sessions + auto-mark absent
   await Promise.all([
     generateClassSessionsForDate(date, semesterId),
     autoCompletePastSessions(semesterId),
   ]);
+  // Must run AFTER autoComplete so completed sessions exist before we mark absent
+  await autoMarkAbsentForCompletedSessions(semesterId);
 
   // Is date ke class sessions fetch karo with subject info
   // !inner join se sirf is semester ke subjects filter ho jaayenge
