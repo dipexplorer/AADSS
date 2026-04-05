@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
   cancelClassAndCascade,
+  restoreClassAndCascade,
   rescheduleClassSession,
   updateClassSessionStatus,
 } from "@/lib/admin/actions";
@@ -178,10 +179,10 @@ export default function ClassSessionsClient({ sessions, targetDate, todayStr }: 
   // Action: Restore
   function handleRestore(id: string) {
     startTransition(async () => {
-      const res = await updateClassSessionStatus(id, "scheduled");
+      const res = await restoreClassAndCascade(id);
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Session restored to scheduled state.");
+        toast.success("Session restored & attendance un-cancelled!");
         setRecentlyCancelledNode(null);
       }
     });
