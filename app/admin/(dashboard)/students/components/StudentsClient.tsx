@@ -12,7 +12,9 @@ import {
   ShieldCheck,
   AlertTriangle,
   Users,
+  FileDown
 } from "lucide-react";
+import BulkUploadModal from "./BulkUploadModal";
 
 interface StudentProps {
   students: any[];
@@ -29,6 +31,7 @@ export default function StudentsClient({ students }: StudentProps) {
   const [search, setSearch] = useState("");
   const [filterRisk, setFilterRisk] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
 
   const studentsWithMeta = useMemo(() => {
     return students.map((s) => {
@@ -140,6 +143,13 @@ export default function StudentsClient({ students }: StudentProps) {
           </select>
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         </div>
+        <button
+          onClick={() => setShowBulkUpload(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors whitespace-nowrap"
+        >
+          <FileDown className="w-4 h-4" />
+          Bulk Enroll Students
+        </button>
       </div>
 
       {/* Table */}
@@ -179,6 +189,11 @@ export default function StudentsClient({ students }: StudentProps) {
           </table>
         </div>
       </div>
+
+      {/* MODAL */}
+      {showBulkUpload && (
+        <BulkUploadModal onClose={() => setShowBulkUpload(false)} />
+      )}
     </div>
   );
 }
