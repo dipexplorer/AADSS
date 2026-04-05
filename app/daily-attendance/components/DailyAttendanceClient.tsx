@@ -107,11 +107,15 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
           // No location — server will decide if geo-fence is required
         }
 
+        // Generate the device fingerprint (must match onboarding logic)
+        const deviceFingerprint = btoa(navigator.userAgent + window.screen.width + "ACADENCE_SECURE_GEO");
+
         const result = await markAttendance(
           sessionId,
           profile.id,
           "present",
           userLocation,
+          deviceFingerprint
         );
 
         if (result.error) {

@@ -37,7 +37,11 @@ export default function LoginPage() {
       }
 
       toast.success("Welcome back! 🚀");
-      router.push("/calendar-dashboard");
+      if (res.needsOnboarding) {
+        router.push("/onboarding");
+      } else {
+        router.push("/calendar-dashboard");
+      }
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -132,14 +136,13 @@ export default function LoginPage() {
         </form>
 
         {/* Footer */}
-        <div className="mt-8 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="text-foreground font-semibold hover:underline transition-colors"
-          >
-            Create an account
-          </Link>
+        <div className="mt-8 text-center text-[13px] text-muted-foreground">
+          <p>
+            Accounts are strictly provisioned by the University Administration.
+          </p>
+          <p className="mt-1">
+            Contact your Administration if you cannot access your account.
+          </p>
         </div>
       </div>
     </div>

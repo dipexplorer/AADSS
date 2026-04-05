@@ -19,5 +19,8 @@ export async function login(email: string, password: string) {
     return { error: error.message };
   }
 
-  return { success: true };
+  const user = data?.user;
+  const needsOnboarding = !user?.user_metadata?.device_id || !user?.user_metadata?.full_name;
+
+  return { success: true, needsOnboarding };
 }

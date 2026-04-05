@@ -30,8 +30,22 @@ export async function markAttendance(
   studentProfileId: string,
   status: "present",
   location?: GeoLocation,
+  deviceFingerprint?: string
 ): Promise<MarkAttendanceResult> {
   const supabase = createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "Authentication failed. Please log in again.", validationError: "AUTH_ERROR" };
+  }
+
+  // ── Guard: Device Fingerprint Verification ────────────────────────
+  if (user.user_metadata?.device_id && user.user_metadata.device_id !== deviceFingerprint) {
+    return {
+      error: "Proxy Detected: You must use your registered primary attendance device.",
+      validationError: "PROXY_DETECTED",
+    };
+  }
 
   // ── Guard: Students can ONLY mark themselves present ──────────────
   // absent / cancelled are system/admin responsibilities.

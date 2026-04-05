@@ -2,11 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export async function createProfile(
-  sessionId: string,
-  programId: string,
-  semesterId: string,
-) {
+export async function verifyStudentProfile(fullName: string, deviceFingerprint: string) {
   const supabase = createClient();
 
   const {
@@ -18,26 +14,27 @@ export async function createProfile(
     return { error: "Not authenticated" };
   }
 
-  // Check if profile already exists
+  // Ensure the admin actually provisioned this student in student_profiles
   const { data: existing } = await supabase
     .from("student_profiles")
     .select("id")
     .eq("user_id", user.id)
     .single();
 
-  if (existing) {
-    return { error: "Profile already exists" };
+  if (!existing) {
+    return { error: "Access Denied: Your academic profile hasn't been provisioned by the Admin. Please contact HOD." };
   }
 
-  const { error } = await supabase.from("student_profiles").insert({
-    user_id: user.id,
-    session_id: sessionId,
-    program_id: programId,
-    semester_id: semesterId,
+  // Update User Metadata with their actual full name and locked Device Fingerprint
+  const { error: updateErr } = await supabase.auth.updateUser({
+    data: {
+      full_name: fullName.trim(),
+      device_id: deviceFingerprint,
+    }
   });
 
-  if (error) {
-    return { error: error.message };
+  if (updateErr) {
+    return { error: updateErr.message };
   }
 
   return { success: true };

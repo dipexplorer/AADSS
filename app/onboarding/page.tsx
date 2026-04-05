@@ -3,138 +3,152 @@
 import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { createProfile } from "@/server/auth/completeProfile";
+import { verifyStudentProfile } from "@/server/auth/completeProfile";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
-
-type Option = { id: string; name: string };
+import { ShieldCheck, Smartphone, GraduationCap, Loader2 } from "lucide-react";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
-  //   const [error, setError] = useState("");
-
-  const [programs, setPrograms] = useState<Option[]>([]);
-  const [sessions, setSessions] = useState<Option[]>([]);
-  const [semesters, setSemesters] = useState<Option[]>([]);
-
-  const [programId, setProgramId] = useState("");
-  const [sessionId, setSessionId] = useState("");
-  const [semesterId, setSemesterId] = useState("");
+  const [loadingContext, setLoadingContext] = useState(true);
+  
+  const [fullName, setFullName] = useState("");
+  const [academicContext, setAcademicContext] = useState<{program: string, sem: number} | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
 
-  // Programs fetch
+  // Fetch pre-provisioned data
   useEffect(() => {
-    supabase
-      .from("programs")
-      .select("id, name")
-      .then(({ data }) => setPrograms(data ?? []));
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      
+      const { data: profile } = await supabase
+        .from("student_profiles")
+        .select(`
+           programs (name),
+           semesters (semester_number)
+        `)
+        .eq("user_id", user.id)
+        .single();
+        
+      if (profile) {
+        setAcademicContext({
+          program: (profile.programs as any)?.name || "Unknown Program",
+          sem: (profile.semesters as any)?.semester_number || 0
+        });
+      }
+      
+      if (user.user_metadata?.full_name) {
+         setFullName(user.user_metadata.full_name);
+      }
+      setLoadingContext(false);
+    }
+    loadData();
+  }, [supabase, router]);
 
-    supabase
-      .from("academic_sessions")
-      .select("id, name")
-      .then(({ data }) => setSessions(data ?? []));
-  }, []);
-
-  // Semesters — program select hone ke baad
-  useEffect(() => {
-    if (!programId) return;
-    supabase
-      .from("semesters")
-      .select("id, semester_number")
-      .eq("program_id", programId)
-      .then(({ data }) =>
-        setSemesters(
-          (data ?? []).map((s) => ({
-            id: s.id,
-            name: `Semester ${s.semester_number}`,
-          })),
-        ),
-      );
-  }, [programId]);
-
-  async function handleSubmit(e: React.SubmitEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!programId || !sessionId || !semesterId) {
-      toast.error("Sab fields fill karo");
+    if (!fullName.trim()) {
+      toast.error("Please enter your full name");
       return;
     }
 
     setIsPending(true);
-    // setError("");
 
     try {
-      const res = await createProfile(sessionId, programId, semesterId);
+      // 1. Generate a mock Device Fingerprint (in production, use a library like FingerprintJS)
+      // For academic integrity prototype, we use the UserAgent + Screen size hash roughly.
+      const deviceFingerprint = btoa(navigator.userAgent + window.screen.width + "ACADENCE_SECURE_GEO");
+      
+      const res = await verifyStudentProfile(fullName, deviceFingerprint);
 
       if (res?.error) {
         toast.error(res.error);
         return;
       }
 
-      toast.success("Profile created successfully");
+      toast.success("Profile verified securely!");
       router.push("/calendar-dashboard");
     } catch {
-      toast.error("Something went wrong");
+      toast.error("Something went wrong verifying your profile");
     } finally {
       setIsPending(false);
     }
   }
 
+  if (loadingContext) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-80">
-        <h1 className="text-xl font-semibold">Setup your profile</h1>
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background p-4">
+      {/* Background Mesh */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,var(--tw-gradient-stops))] from-blue-500/10 via-background to-background pointer-events-none" />
+      
+      <div className="relative w-full max-w-md p-8 bg-card border shadow-xl rounded-3xl z-10">
+        <div className="flex flex-col items-center mb-8 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-green-500/10 text-green-600 flex items-center justify-center mb-4">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">Welcome to Acadence!</h1>
+          <p className="text-muted-foreground text-sm mt-2">
+            Please verify your identity to access your academic dashboard.
+          </p>
+        </div>
 
-        <select
-          value={sessionId}
-          onChange={(e) => setSessionId(e.target.value)}
-          className="border rounded px-3 py-2 text-sm"
-        >
-          <option value="">Select Academic Session</option>
-          {sessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Admin Provisioned Read-Only Context */}
+          <div className="p-4 bg-muted/50 rounded-xl border space-y-3">
+             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Admin Provisioned Details</p>
+             <div className="flex items-center gap-3">
+                <GraduationCap className="w-5 h-5 text-primary" />
+                <div>
+                   <p className="font-semibold text-sm">{academicContext?.program || "Processing..."}</p>
+                   <p className="text-xs text-muted-foreground">Semester {academicContext?.sem || "Processing..."}</p>
+                </div>
+             </div>
+          </div>
 
-        <select
-          value={programId}
-          onChange={(e) => {
-            setProgramId(e.target.value);
-            setSemesterId("");
-          }}
-          className="border rounded px-3 py-2 text-sm"
-        >
-          <option value="">Select Program</option>
-          {programs.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Your Full Legal Name</label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="e.g. John Doe"
+              className="w-full px-4 py-3 border rounded-xl bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+              required
+            />
+          </div>
 
-        <select
-          value={semesterId}
-          onChange={(e) => setSemesterId(e.target.value)}
-          className="border rounded px-3 py-2 text-sm"
-          disabled={!programId}
-        >
-          <option value="">Select Semester</option>
-          {semesters.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+          {/* GEO Device Warning */}
+          <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-xl flex items-start gap-3">
+            <Smartphone className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-blue-900 dark:text-blue-300">Register this Smartphone as your Primary Attendance Device</p>
+              <p className="text-xs text-blue-800/80 dark:text-blue-400/80 mt-1">
+                By clicking verify, this device will be <b>locked</b>.
+                This prevents proxy attendance using other devices.
+              </p>
+            </div>
+          </div>
 
-        {/* {error && <p className="text-red-500 text-sm">{error}</p>} */}
-
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving..." : "Continue"}
-        </Button>
-      </form>
+          <Button type="submit" disabled={isPending} className="w-full py-6 rounded-xl font-bold">
+            {isPending ? (
+               <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Verifying Profile...</>
+            ) : "Complete Verification & Access App"}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }
