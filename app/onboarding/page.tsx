@@ -7,6 +7,7 @@ import { verifyStudentProfile } from "@/server/auth/completeProfile";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
 import { ShieldCheck, Smartphone, GraduationCap, Loader2 } from "lucide-react";
+import { getDeviceFingerprint } from "@/lib/fingerprint";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -61,9 +62,8 @@ export default function OnboardingPage() {
     setIsPending(true);
 
     try {
-      // 1. Generate a mock Device Fingerprint (in production, use a library like FingerprintJS)
-      // For academic integrity prototype, we use the UserAgent + Screen size hash roughly.
-      const deviceFingerprint = btoa(navigator.userAgent + window.screen.width + "ACADENCE_SECURE_GEO");
+      // 1. Generate a robust Device Fingerprint using FingerprintJS
+      const deviceFingerprint = await getDeviceFingerprint();
       
       const res = await verifyStudentProfile(fullName, deviceFingerprint);
 

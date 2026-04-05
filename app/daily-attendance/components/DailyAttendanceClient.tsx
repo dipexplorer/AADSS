@@ -13,6 +13,7 @@ import DateNavigator from "@/app/daily-attendance/components/DateNavigator";
 import ScheduleTimeline from "@/app/daily-attendance/components/ScheduleTimeline";
 import dynamic from "next/dynamic";
 import type { GeoLocation } from "@/lib/engines/validation/types";
+import { getDeviceFingerprint } from "@/lib/fingerprint";
 
 const NotesEditor = dynamic(
   () => import("@/app/daily-attendance/components/NotesEditor"),
@@ -107,8 +108,8 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
           // No location — server will decide if geo-fence is required
         }
 
-        // Generate the device fingerprint (must match onboarding logic)
-        const deviceFingerprint = btoa(navigator.userAgent + window.screen.width + "ACADENCE_SECURE_GEO");
+        // Get locked device fingerprint via FingerprintJS
+        const deviceFingerprint = await getDeviceFingerprint();
 
         const result = await markAttendance(
           sessionId,
