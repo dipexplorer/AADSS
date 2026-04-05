@@ -1,15 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import { DefaulterRecord } from "@/lib/admin/defaulters";
 import {
   Download,
   Search,
-  ExternalLink,
   AlertOctagon,
   Printer,
-  ChevronDown
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -24,8 +22,30 @@ export default function DefaultersClient({
   const [selectedSubject, setSelectedSubject] = useState("All");
   const [selectedProgram, setSelectedProgram] = useState("All");
 
-  const uniqueSubjects = useMemo(() => Array.from(new Set(data.map((d) => d.subject_name || ""))).filter(Boolean), [data]);
-  const uniquePrograms = useMemo(() => Array.from(new Set(data.filter(d => d.program_name).map((d) => `${d.program_name} - Sem ${d.semester_number}`))), [data]);
+  const uniquePrograms = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          data
+            .filter((d) => d.program_name)
+            .map((d) => `${d.program_name} - Sem ${d.semester_number}`),
+        ),
+      ),
+    [data],
+  );
+
+  const uniqueSubjects = useMemo(() => {
+    let contextData = data;
+    if (selectedProgram !== "All") {
+      contextData = data.filter(
+        (d) =>
+          `${d.program_name} - Sem ${d.semester_number}` === selectedProgram,
+      );
+    }
+    return Array.from(
+      new Set(contextData.map((d) => d.subject_name || "")),
+    ).filter(Boolean);
+  }, [data, selectedProgram]);
 
   const filteredData = useMemo(() => {
     return data.filter((d) => {
@@ -33,45 +53,107 @@ export default function DefaultersClient({
       const subjectName = d.subject_name || "";
       const progName = d.program_name || "";
 
-      const matchSearch = 
+      const matchSearch =
         studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         subjectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         progName.toLowerCase().includes(searchQuery.toLowerCase());
-        
+
       const progSemName = `${progName} - Sem ${d.semester_number}`;
-        
-      const matchSubject = selectedSubject === "All" || subjectName === selectedSubject;
-      const matchProgram = selectedProgram === "All" || progSemName === selectedProgram;
+
+      const matchSubject =
+        selectedSubject === "All" || subjectName === selectedSubject;
+      const matchProgram =
+        selectedProgram === "All" || progSemName === selectedProgram;
 
       return matchSearch && matchSubject && matchProgram;
     });
   }, [data, searchQuery, selectedSubject, selectedProgram]);
 
+  // Pivot the data: Group by Student, creating dedicated columns for exact active subjects
+  const { groupedStudents, activeSubjectCols } = useMemo(() => {
+    const activeSubjectCols = Array.from(
+      new Set(filteredData.map((d) => d.subject_name)),
+    );
+
+    const map = new Map<
+      string,
+      {
+        student_id: string;
+        student_name: string;
+        student_email: string;
+        program_name: string;
+        semester_number: number;
+        subjects: Record<
+          string,
+          { actual: number; required: number; deficit: string }
+        >;
+      }
+    >();
+
+    filteredData.forEach((d) => {
+      if (!map.has(d.student_id)) {
+        const fallBackName = d.student_name || (d.student_email ? d.student_email.split('@')[0] : "Student");
+        map.set(d.student_id, {
+          student_id: d.student_id,
+          student_name: fallBackName,
+          student_email: d.student_email || "",
+          program_name: d.program_name,
+          semester_number: d.semester_number,
+          subjects: {},
+        });
+      }
+
+      const deficit = (d.min_required_percent - d.actual_percent).toFixed(1);
+      map.get(d.student_id)!.subjects[d.subject_name] = {
+        actual: d.actual_percent,
+        required: d.min_required_percent,
+        deficit,
+      };
+    });
+
+    return {
+      groupedStudents: Array.from(map.values()),
+      activeSubjectCols,
+    };
+  }, [filteredData]);
+
   const handleExportCSV = () => {
-    if (filteredData.length === 0) return;
+    if (groupedStudents.length === 0) return;
 
     const headers = [
       "Student Name",
       "Email",
-      "Current %",
+      "Program & Sem",
+      ...activeSubjectCols,
     ];
 
-    const rows = filteredData.map((d) => [
-      `"${d.student_name || "Unknown"}"`,
-      `"${d.student_email || ""}"`,
-      d.actual_percent,
-    ]);
+    const rows = groupedStudents.map((s) => {
+      const rowData = [
+        `"${s.student_name}"`,
+        `"${s.student_email}"`,
+        `"${s.program_name} - Sem ${s.semester_number}"`,
+      ];
+
+      activeSubjectCols.forEach((col) => {
+        const subj = s.subjects[col];
+        if (subj) {
+          rowData.push(`"-${subj.deficit}% (Act: ${subj.actual}%)"`);
+        } else {
+          rowData.push(`"SAFE / NA"`);
+        }
+      });
+      return rowData;
+    });
 
     const csvContent = [
       headers.join(","),
       ...rows.map((e) => e.join(",")),
     ].join("\n");
-
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    const filename = `Eligibility_Report${selectedSubject !== "All" ? `_${selectedSubject.replace(/\s+/g, '_')}` : ''}_${new Date().toISOString().split("T")[0]}.csv`;
+    const filename = `Eligibility_Report_${new Date().toISOString().split("T")[0]}.csv`;
     link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
@@ -92,7 +174,7 @@ export default function DefaultersClient({
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in">
-      {/* HEADER -> Using print:hidden to hide it in PDF prints */}
+      {/* HEADER */}
       <div className="print:hidden flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -109,7 +191,10 @@ export default function DefaultersClient({
             <Printer className="w-4 h-4" />
             Print PDF
           </Button>
-          <Button onClick={handleExportCSV} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+          <Button
+            onClick={handleExportCSV}
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+          >
             <Download className="w-4 h-4" />
             Export CSV
           </Button>
@@ -128,108 +213,138 @@ export default function DefaultersClient({
           />
         </div>
 
-        <select 
-          value={selectedProgram} 
+        <select
+          value={selectedProgram}
           onChange={(e) => setSelectedProgram(e.target.value)}
           className="w-full px-4 py-2 border border-border rounded-xl bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm appearance-none"
         >
           <option value="All">All Programs & Semesters</option>
-          {uniquePrograms.map(prog => <option key={prog} value={prog}>{prog}</option>)}
+          {uniquePrograms.map((prog) => (
+            <option key={prog} value={prog}>
+              {prog}
+            </option>
+          ))}
         </select>
 
-        <select 
-          value={selectedSubject} 
+        <select
+          value={selectedSubject}
           onChange={(e) => setSelectedSubject(e.target.value)}
           className="w-full px-4 py-2 border border-border rounded-xl bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm appearance-none"
         >
           <option value="All">All Subjects</option>
-          {uniqueSubjects.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+          {uniqueSubjects.map((sub) => (
+            <option key={sub} value={sub}>
+              {sub}
+            </option>
+          ))}
         </select>
       </div>
 
       {/* PRINT HEADER FOR PDF ONLY */}
-      <div className="hidden print:flex flex-col items-center justify-center mb-10 text-center border-b pb-6 border-black">
-        {selectedProgram !== "All" ? (
-          <h2 className="text-3xl font-bold uppercase tracking-widest text-black mb-2">{selectedProgram}</h2>
-        ) : (
-          <h2 className="text-2xl font-bold uppercase tracking-widest text-black mb-2">Overal Attendance Report</h2>
+      <div className="hidden print:flex flex-col items-center justify-center mb-8 text-center border-b pb-6 border-black mx-auto w-full max-w-4xl">
+        {selectedProgram !== "All" && (
+          <h3 className="text-xl font-bold text-black mb-1">
+            Program: {selectedProgram.replace(" - Sem", " with semester")}
+          </h3>
         )}
-        
         {selectedSubject !== "All" && (
-          <h3 className="text-xl font-bold text-gray-800">Subject: {selectedSubject}</h3>
+          <h3 className="text-lg font-bold text-gray-800">
+            Subject: {selectedSubject}
+          </h3>
         )}
-        
+
         <p className="text-base font-semibold text-red-600 mt-4">
-          Confidential: List of candidates falling below mandated attendance threshold
+          Confidential: Candidate wise shortfall analysis
         </p>
       </div>
 
-      {/* DATA TABLE */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden print:border-none print:shadow-none print:w-[80%] print:mx-auto">
+      {/* DYNAMIC PIPVOT TABLE */}
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden print:border-none print:shadow-none print:w-[90%] print:mx-auto">
         <div className="overflow-x-auto print:overflow-visible">
-          <table className="w-full text-sm text-left print:text-center">
+          <table className="w-full text-sm text-left print:text-center whitespace-nowrap">
             <thead className="bg-accent/50 text-muted-foreground font-medium border-b border-border print:bg-transparent print:border-b-2 print:border-black print:text-black">
               <tr>
-                <th className="px-4 py-4 print:text-center">Student Details</th>
-                <th className="px-4 py-3 print:hidden">Program / Sem</th>
-                <th className="px-4 py-3 print:hidden">Subject Offending</th>
-                <th className="px-4 py-3 text-center print:hidden">Required %</th>
-                <th className="px-4 py-3 text-center">Actual %</th>
-                <th className="px-4 py-3 text-right print:hidden">Deficit</th>
+                <th className="px-4 py-4 print:text-center sticky left-0 bg-card/90 backdrop-blur z-10 print:static print:bg-transparent border-r border-border/50">
+                  Student Details
+                </th>
+
+                {/* Dynamically Generate Columns for EACH Subject */}
+                {activeSubjectCols.map((col) => (
+                  <th
+                    key={col}
+                    className="px-4 py-3 text-center border-r border-border/50 last:border-r-0 min-w-[120px]"
+                  >
+                    <div className="font-semibold text-foreground print:text-black whitespace-normal line-clamp-2 leading-tight">
+                      {col}
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filteredData.length === 0 ? (
+              {groupedStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <td
+                    colSpan={activeSubjectCols.length + 2}
+                    className="px-4 py-12 text-center text-muted-foreground"
+                  >
                     <div className="flex flex-col items-center justify-center">
                       <div className="bg-green-100/50 dark:bg-green-900/20 p-3 rounded-full mb-3">
                         <AlertOctagon className="w-6 h-6 text-green-500" />
                       </div>
-                      <p className="text-base font-medium text-foreground">No Shortfalls Found!</p>
-                      <p className="text-sm text-muted-foreground">All tracked students meet their minimum attendance thresholds.</p>
+                      <p className="text-base font-medium text-foreground">
+                        No Shortfalls Found!
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        All tracked students meet their minimum attendance
+                        thresholds.
+                      </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filteredData.map((d, idx) => {
-                  const deficit = (d.min_required_percent - d.actual_percent).toFixed(1);
-                  return (
-                    <tr
-                      key={`${d.student_id}-${d.subject_code}-${idx}`}
-                      className="border-b border-border/50 hover:bg-accent/20 transition-colors group print:border-black/30"
-                    >
-                      <td className="px-4 py-4 print:text-center">
-                        <div className="font-semibold text-foreground print:text-black print:text-base">{d.student_name}</div>
-                        <div className="text-[11px] text-muted-foreground print:text-gray-600 print:text-sm">{d.student_email}</div>
-                      </td>
-                      <td className="px-4 py-3 print:hidden">
-                        <div className="text-foreground shrink-0">{d.program_name}</div>
-                        <div className="text-xs text-muted-foreground">Sem {d.semester_number}</div>
-                      </td>
-                      <td className="px-4 py-3 print:hidden">
-                        <div className="text-foreground shrink-0">{d.subject_name}</div>
-                        <div className="text-xs font-mono text-muted-foreground">{d.subject_code}</div>
-                      </td>
-                      <td className="px-4 py-3 text-center print:hidden">
-                        <span className="font-medium">{d.min_required_percent}%</span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 print:bg-transparent print:text-red-700 print:text-base print:font-bold">
-                          {d.actual_percent}%
-                        </span>
-                        <div className="text-[10px] text-muted-foreground mt-0.5 print:hidden">
-                          ({d.present_count}/{d.total_count})
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right print:hidden">
-                        <span className="text-red-600 font-bold">
-                          -{deficit}%
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
+                groupedStudents.map((s, idx) => (
+                  <tr
+                    key={s.student_id}
+                    className="border-b border-border/50 hover:bg-accent/20 transition-colors group print:border-black/40"
+                  >
+                    {/* Student Identity */}
+                    <td className="px-4 py-4 print:text-center sticky left-0 bg-card group-hover:bg-accent/20 z-10 print:static print:bg-transparent border-r border-border/50">
+                      <div className="font-bold text-foreground print:text-black print:text-lg">
+                        {s.student_name}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground print:text-gray-600 print:text-sm">
+                        {s.student_email}
+                      </div>
+                    </td>
+
+                    {/* Dedicated Cells for each subject column */}
+                    {activeSubjectCols.map((col) => {
+                      const subj = s.subjects[col];
+                      return (
+                        <td
+                          key={col}
+                          className="px-4 py-4 text-center border-r border-border/50 last:border-r-0"
+                        >
+                          {subj ? (
+                            <div className="flex flex-col items-center justify-center gap-1">
+                                <span className="font-bold text-red-600 text-[15px] leading-none print:text-black print:text-base">
+                                  -{subj.deficit}%
+                                </span>
+                                <span className="text-[11px] text-muted-foreground font-medium print:hidden leading-none">
+                                  Act: {subj.actual}%
+                                </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center text-muted-foreground/30 print:text-gray-400">
+                              -
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
