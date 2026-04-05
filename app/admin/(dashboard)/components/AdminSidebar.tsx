@@ -15,6 +15,7 @@ import {
   LogOut,
   ShieldAlert,
   Loader2,
+  AlertOctagon,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { label: "Timetable", href: "/admin/timetable", icon: Clock },
   { label: "Students", href: "/admin/students", icon: Users },
   { label: "Classes", href: "/admin/classes", icon: CheckSquare },
+  { label: "Eligibility", href: "/admin/defaulters", icon: AlertOctagon },
 ];
 
 export default function AdminSidebar() {
@@ -44,7 +46,7 @@ export default function AdminSidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-background/95 backdrop-blur-xl border-r border-border/50 flex flex-col z-50 transition-all duration-300 shadow-xl">
+    <aside className="fixed left-0 top-0 h-full w-64 bg-background/95 backdrop-blur-xl border-r border-border/50 flex flex-col z-50 transition-all duration-300 shadow-xl print:hidden">
       {/* Logo Area */}
       <div className="p-6 border-b border-border/50">
         <Link href="/admin/dashboard" className="flex items-center gap-3 group">
