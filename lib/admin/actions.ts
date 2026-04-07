@@ -308,7 +308,7 @@ export async function cancelClassAndCascade(classSessionId: string) {
     const chunk = attendanceRows.slice(i, i + CHUNK_SIZE);
     const { error } = await supabase
       .from("attendance")
-      .upsert(chunk, { onConflict: "student_id,class_session_id" });
+      .upsert(chunk, { onConflict: "student_id,class_session_id", ignoreDuplicates: true });
     if (error) return { error: error.message };
   }
 
@@ -341,6 +341,34 @@ export async function restoreClassAndCascade(classSessionId: string) {
     .delete()
     .eq("class_session_id", classSessionId)
     .eq("status", "cancelled");
+
+  if (attendanceErr) return { error: attendanceErr.message };
+
+  revalidatePath("/admin/classes");
+  revalidatePath("/admin/students");
+  return { success: true };
+}
+
+/**
+ * Admin undoes a completed class session.
+ * Reverts to 'scheduled' and removes auto-generated 'absent' attendance marks.
+ */
+export async function undoClassCompletion(classSessionId: string) {
+  const supabase = await requireAdmin();
+
+  const { error: sessionErr } = await supabase
+    .from("class_sessions")
+    .update({ status: "scheduled" })
+    .eq("id", classSessionId);
+
+  if (sessionErr) return { error: sessionErr.message };
+
+  // Delete auto-assigned 'absent' records
+  const { error: attendanceErr } = await supabase
+    .from("attendance")
+    .delete()
+    .eq("class_session_id", classSessionId)
+    .eq("status", "absent");
 
   if (attendanceErr) return { error: attendanceErr.message };
 

@@ -9,6 +9,7 @@ import {
   restoreClassAndCascade,
   rescheduleClassSession,
   updateClassSessionStatus,
+  undoClassCompletion,
 } from "@/lib/admin/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -194,6 +195,15 @@ export default function ClassSessionsClient({ sessions, targetDate, todayStr }: 
       const res = await updateClassSessionStatus(id, "completed");
       if (res?.error) toast.error(res.error);
       else toast.success("Session marked as completed.");
+    });
+  }
+
+  // Action: Undo Mark Completed
+  function handleUndoComplete(id: string) {
+    startTransition(async () => {
+      const res = await undoClassCompletion(id);
+      if (res?.error) toast.error(res.error);
+      else toast.success("Session reverted to scheduled. Absentees cleared.");
     });
   }
 
@@ -474,106 +484,112 @@ export default function ClassSessionsClient({ sessions, targetDate, todayStr }: 
 
                           {/* Action Controls */}
                           <div className="flex flex-col sm:items-end sm:justify-start gap-2 shrink-0 border-t sm:border-t-0 pt-4 sm:pt-0 border-border/50 min-w-[140px]">
-                            {isPastDate ? (
-                              <div className="w-full text-center sm:text-right px-3 py-1.5 bg-muted/50 rounded-lg border border-border text-xs text-muted-foreground font-medium flex items-center justify-center sm:justify-end gap-1.5 h-[32px]">
-                                <Info className="w-3.5 h-3.5" />
-                                {statusConf.label} (Read-Only)
-                              </div>
-                            ) : (
+                            {s.status === "scheduled" && (
                               <>
-                                {s.status === "scheduled" && (
-                                  <>
-                                    {confirmCancelId === s.id ? (
-                                      <div className="flex flex-col gap-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl p-3 shadow-sm animate-in zoom-in-95 duration-200">
-                                        <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-300 font-semibold mb-1">
-                                          <AlertTriangle className="w-4 h-4" />
-                                          Impact Warning
-                                        </div>
-                                        <p className="text-xs text-red-700/80 dark:text-red-400/80 leading-relaxed max-w-[200px]">
-                                          This will cascade absent/cancelled status
-                                          to all students, waiving their attendance
-                                          requirement.
-                                        </p>
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <Button
-                                            size="sm"
-                                            variant="destructive"
-                                            className="h-7 text-xs w-full"
-                                            onClick={() =>
-                                              handleCancelWithCascade(s.id)
-                                            }
-                                            disabled={isPending}
-                                          >
-                                            {isPending
-                                              ? "Processing..."
-                                              : "Confirm"}
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-7 text-xs px-2"
-                                            onClick={() => setConfirmCancelId(null)}
-                                          >
-                                            <X className="w-3.5 h-3.5" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col gap-2 w-full">
-                                        {!isFutureDate && (
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-8 w-full justify-start text-xs font-medium text-muted-foreground hover:text-green-600 hover:bg-green-50 hover:border-green-200 dark:hover:bg-green-950/30 dark:hover:border-green-900/50"
-                                            onClick={() => handleMarkCompleted(s.id)}
-                                          >
-                                            <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                                            Complete Class
-                                          </Button>
-                                        )}
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-8 w-full justify-start text-xs font-medium text-muted-foreground hover:text-primary hover:bg-primary/5 hover:border-primary/20"
-                                          onClick={() => {
-                                            setRescheduleId(s.id);
-                                            setRescheduleData({
-                                              date: s.date,
-                                              start_time: s.start_time?.slice(0, 5),
-                                              end_time: s.end_time?.slice(0, 5),
-                                            });
-                                          }}
-                                        >
-                                          <Clock className="w-3.5 h-3.5 mr-1.5" />
-                                          Reschedule
-                                        </Button>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-8 w-full justify-start text-xs font-medium text-muted-foreground hover:text-red-600 hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-950/30 dark:hover:border-red-900/50"
-                                          onClick={() => setConfirmCancelId(s.id)}
-                                        >
-                                          <XOctagon className="w-3.5 h-3.5 mr-1.5" />
-                                          Cancel Class
-                                        </Button>
-                                      </div>
+                                {confirmCancelId === s.id ? (
+                                  <div className="flex flex-col gap-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl p-3 shadow-sm animate-in zoom-in-95 duration-200">
+                                    <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-300 font-semibold mb-1">
+                                      <AlertTriangle className="w-4 h-4" />
+                                      Impact Warning
+                                    </div>
+                                    <p className="text-xs text-red-700/80 dark:text-red-400/80 leading-relaxed max-w-[200px]">
+                                      This will cascade absent/cancelled status
+                                      to all students, waiving their attendance
+                                      requirement.
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        className="h-7 text-xs w-full"
+                                        onClick={() =>
+                                          handleCancelWithCascade(s.id)
+                                        }
+                                        disabled={isPending}
+                                      >
+                                        {isPending
+                                          ? "Processing..."
+                                          : "Confirm"}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs px-2"
+                                        onClick={() => setConfirmCancelId(null)}
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-2 w-full">
+                                    {!isFutureDate && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-full justify-start text-xs font-medium text-muted-foreground hover:text-green-600 hover:bg-green-50 hover:border-green-200 dark:hover:bg-green-950/30 dark:hover:border-green-900/50"
+                                        onClick={() => handleMarkCompleted(s.id)}
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                                        Complete Class
+                                      </Button>
                                     )}
-                                  </>
-                                )}
-
-                                {s.status === "cancelled" && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleRestore(s.id)}
-                                    disabled={isPending}
-                                    className="h-8 gap-1.5 text-xs font-medium w-full justify-start bg-card hover:bg-green-50 hover:text-green-700 hover:border-green-200 dark:hover:bg-green-950/30 dark:hover:border-green-800"
-                                  >
-                                    <RotateCcw className="w-3.5 h-3.5" />
-                                    Restore Session
-                                  </Button>
+                                    {!isPastDate && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-full justify-start text-xs font-medium text-muted-foreground hover:text-primary hover:bg-primary/5 hover:border-primary/20"
+                                        onClick={() => {
+                                          setRescheduleId(s.id);
+                                          setRescheduleData({
+                                            date: s.date,
+                                            start_time: s.start_time?.slice(0, 5),
+                                            end_time: s.end_time?.slice(0, 5),
+                                          });
+                                        }}
+                                      >
+                                        <Clock className="w-3.5 h-3.5 mr-1.5" />
+                                        Reschedule
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 w-full justify-start text-xs font-medium text-muted-foreground hover:text-red-600 hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-950/30 dark:hover:border-red-900/50"
+                                      onClick={() => setConfirmCancelId(s.id)}
+                                    >
+                                      <XOctagon className="w-3.5 h-3.5 mr-1.5" />
+                                      Cancel Class
+                                    </Button>
+                                  </div>
                                 )}
                               </>
+                            )}
+
+                            {s.status === "cancelled" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRestore(s.id)}
+                                disabled={isPending}
+                                className="h-8 gap-1.5 text-xs font-medium w-full justify-start bg-card hover:bg-green-50 hover:text-green-700 hover:border-green-200 dark:hover:bg-green-950/30 dark:hover:border-green-800"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Restore Session
+                              </Button>
+                            )}
+
+                            {s.status === "completed" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleUndoComplete(s.id)}
+                                disabled={isPending}
+                                className="h-8 gap-1.5 text-xs font-medium w-full justify-start bg-card hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 dark:hover:bg-amber-950/30 dark:hover:border-amber-800"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Undo Complete
+                              </Button>
                             )}
                           </div>
                         </div>
