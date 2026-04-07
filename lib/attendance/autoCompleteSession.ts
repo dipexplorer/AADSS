@@ -2,6 +2,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { markAbsenteesForSession } from "@/lib/attendance/markAbsentees";
 
 /**
  * Past + today's ended scheduled sessions ko automatically "completed" mark karta hai.
@@ -45,5 +46,12 @@ export async function autoCompletePastSessions(
     .select("id");
 
   if (error) return { updated: 0, error: error.message };
+
+  if (data && data.length > 0) {
+    for (const session of data) {
+      await markAbsenteesForSession(session.id);
+    }
+  }
+
   return { updated: data?.length ?? 0, error: null };
 }

@@ -3,6 +3,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { markAbsenteesForSession } from "@/lib/attendance/markAbsentees";
 
 // ── Helper ──────────────────────────────────────────────────────
 async function requireAdmin() {
@@ -223,6 +224,11 @@ export async function updateClassSessionStatus(
     .update({ status })
     .eq("id", id);
   if (error) return { error: error.message };
+
+  if (status === "completed") {
+    await markAbsenteesForSession(id);
+  }
+
   revalidatePath("/admin/classes");
   return { success: true };
 }
