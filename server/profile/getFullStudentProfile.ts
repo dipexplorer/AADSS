@@ -40,6 +40,9 @@ export async function getFullStudentProfile(): Promise<{
   error: string | null;
 }> {
   const supabase = createClient();
+  // Cast to any to bypass stale generated types
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
 
   const {
     data: { user },
@@ -48,8 +51,8 @@ export async function getFullStudentProfile(): Promise<{
 
   if (authError || !user) return { data: null, error: "Not authenticated" };
 
-  // Fetch the profile row with all relations
-  const { data: profile, error: profileError } = await supabase
+  // Fetch the profile row with all FK relations expanded
+  const { data: profile, error: profileError } = await db
     .from("student_profiles")
     .select(
       `
@@ -76,21 +79,24 @@ export async function getFullStudentProfile(): Promise<{
     .eq("user_id", user.id)
     .single();
 
-  if (profileError || !profile)
+  if (profileError || !profile) {
     return { data: null, error: profileError?.message ?? "Profile not found" };
+  }
 
   // Fetch overall attendance totals for this student
-  const { data: attendanceRows } = await supabase
+  const { data: attendanceRows } = await db
     .from("attendance")
     .select("status")
     .eq("student_id", profile.id);
 
   const total = attendanceRows?.length ?? 0;
-  const present = attendanceRows?.filter((r) => r.status === "present").length ?? 0;
-  const absent = attendanceRows?.filter((r) => r.status === "absent").length ?? 0;
+  const present =
+    attendanceRows?.filter((r: { status: string }) => r.status === "present").length ?? 0;
+  const absent =
+    attendanceRows?.filter((r: { status: string }) => r.status === "absent").length ?? 0;
   const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
 
-  // Auth metadata: device_id, roll_number (from the auth user object)
+  // device_id comes from auth user metadata
   const device_id = (user.user_metadata?.device_id as string) ?? null;
 
   const sem = profile.semesters as any;
@@ -100,25 +106,31 @@ export async function getFullStudentProfile(): Promise<{
     data: {
       id: profile.id,
       user_id: profile.user_id,
-      full_name: profile.full_name ?? (user.user_metadata?.full_name as string) ?? null,
-      roll_number: profile.roll_number ?? (user.user_metadata?.roll_number as string) ?? null,
+      full_name:
+        profile.full_name ??
+        (user.user_metadata?.full_name as string) ??
+        null,
+      roll_number:
+        profile.roll_number ??
+        (user.user_metadata?.roll_number as string) ??
+        null,
       email: user.email ?? "",
       created_at: profile.created_at ?? null,
       device_id,
       is_device_registered: !!device_id,
       program: profile.programs
-        ? { id: (profile.programs as any).id, name: (profile.programs as any).name }
+        ? { id: profile.programs.id, name: profile.programs.name }
         : null,
       semester: sem
         ? { id: sem.id, semester_number: sem.semester_number }
         : null,
       session: profile.academic_sessions
         ? {
-            id: (profile.academic_sessions as any).id,
-            name: (profile.academic_sessions as any).name,
-            start_date: (profile.academic_sessions as any).start_date,
-            end_date: (profile.academic_sessions as any).end_date,
-            status: (profile.academic_sessions as any).status,
+            id: profile.academic_sessions.id,
+            name: profile.academic_sessions.name,
+            start_date: profile.academic_sessions.start_date,
+            end_date: profile.academic_sessions.end_date,
+            status: profile.academic_sessions.status,
           }
         : null,
       subjects,

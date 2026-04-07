@@ -15,12 +15,14 @@ export async function submitDeviceResetRequest(reason: string): Promise<{
   }
 
   const supabase = createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser();
   if (authErr || !user) return { error: "Not authenticated." };
 
   // Get student profile id
-  const { data: profile } = await supabase
+  const { data: profile } = await db
     .from("student_profiles")
     .select("id")
     .eq("user_id", user.id)
@@ -32,7 +34,7 @@ export async function submitDeviceResetRequest(reason: string): Promise<{
   const cooldownDate = new Date();
   cooldownDate.setDate(cooldownDate.getDate() - COOLDOWN_DAYS);
 
-  const { data: recentRequest } = await supabase
+  const { data: recentRequest } = await db
     .from("device_reset_requests")
     .select("requested_at")
     .eq("student_profile_id", profile.id)
@@ -43,7 +45,9 @@ export async function submitDeviceResetRequest(reason: string): Promise<{
 
   if (recentRequest) {
     const requestedAt = new Date(recentRequest.requested_at);
-    const nextAllowed = new Date(requestedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+    const nextAllowed = new Date(
+      requestedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000
+    );
     const msLeft = nextAllowed.getTime() - Date.now();
     const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
     return {
@@ -53,7 +57,7 @@ export async function submitDeviceResetRequest(reason: string): Promise<{
   }
 
   // Insert the request
-  const { error: insertErr } = await supabase
+  const { error: insertErr } = await db
     .from("device_reset_requests")
     .insert({
       student_profile_id: profile.id,
@@ -82,13 +86,17 @@ export async function getMyResetRequests(): Promise<{
   error: string | null;
 }> {
   const supabase = createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: [], error: "Not authenticated" };
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("device_reset_requests")
-    .select("id, reason, status, admin_notes, requested_at, reviewed_at, activates_at, completed_at")
+    .select(
+      "id, reason, status, admin_notes, requested_at, reviewed_at, activates_at, completed_at"
+    )
     .eq("user_id", user.id)
     .order("requested_at", { ascending: false })
     .limit(5);
