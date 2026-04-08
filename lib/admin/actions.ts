@@ -62,7 +62,9 @@ export async function deleteSession(id: string) {
 // ── Programs ────────────────────────────────────────────────────
 export async function createProgram(name: string, session_id: string) {
   const supabase = await requireAdmin();
-  const { error } = await supabase.from("programs").insert({ name, session_id });
+  const { error } = await supabase
+    .from("programs")
+    .insert({ name, session_id });
   if (error) return { error: error.message };
   revalidatePath("/admin/sessions");
   return { success: true };
@@ -70,7 +72,10 @@ export async function createProgram(name: string, session_id: string) {
 
 export async function updateProgram(id: string, name: string) {
   const supabase = await requireAdmin();
-  const { error } = await supabase.from("programs").update({ name }).eq("id", id);
+  const { error } = await supabase
+    .from("programs")
+    .update({ name })
+    .eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/admin/sessions");
   return { success: true };
@@ -103,7 +108,7 @@ export async function updateSemester(
   data: {
     program_id?: string;
     semester_number?: number;
-  }
+  },
 ) {
   const supabase = await requireAdmin();
   const { error } = await supabase.from("semesters").update(data).eq("id", id);
@@ -126,7 +131,7 @@ export async function createSubject(
   name: string,
   code: string,
   credits: number,
-  min_attendance_required: number
+  min_attendance_required: number,
 ) {
   const supabase = await requireAdmin();
   const { error } = await supabase.from("subjects").insert({
@@ -259,7 +264,9 @@ export async function rescheduleClassSession(
  */
 export async function cancelClassAndCascade(classSessionId: string) {
   const supabase = await requireAdmin();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: session, error: sessionErr } = await supabase
     .from("class_sessions")
@@ -270,8 +277,11 @@ export async function cancelClassAndCascade(classSessionId: string) {
   if (sessionErr || !session) return { error: "Session not found" };
   if (session.status === "cancelled") return { error: "Already cancelled" };
 
-  const subjectData = session.subjects as unknown as { semester_id: string } | null;
-  if (!subjectData?.semester_id) return { error: "Semester not found for session" };
+  const subjectData = session.subjects as unknown as {
+    semester_id: string;
+  } | null;
+  if (!subjectData?.semester_id)
+    return { error: "Semester not found for session" };
   const semesterId = subjectData.semester_id;
 
   const { error: cancelErr } = await supabase
@@ -308,7 +318,7 @@ export async function cancelClassAndCascade(classSessionId: string) {
     const chunk = attendanceRows.slice(i, i + CHUNK_SIZE);
     const { error } = await supabase
       .from("attendance")
-      .upsert(chunk, { onConflict: "student_id,class_session_id", ignoreDuplicates: true });
+      .upsert(chunk, { onConflict: "student_id,class_session_id" });
     if (error) return { error: error.message };
   }
 
@@ -350,34 +360,6 @@ export async function restoreClassAndCascade(classSessionId: string) {
 }
 
 /**
- * Admin undoes a completed class session.
- * Reverts to 'scheduled' and removes auto-generated 'absent' attendance marks.
- */
-export async function undoClassCompletion(classSessionId: string) {
-  const supabase = await requireAdmin();
-
-  const { error: sessionErr } = await supabase
-    .from("class_sessions")
-    .update({ status: "scheduled" })
-    .eq("id", classSessionId);
-
-  if (sessionErr) return { error: sessionErr.message };
-
-  // Delete auto-assigned 'absent' records
-  const { error: attendanceErr } = await supabase
-    .from("attendance")
-    .delete()
-    .eq("class_session_id", classSessionId)
-    .eq("status", "absent");
-
-  if (attendanceErr) return { error: attendanceErr.message };
-
-  revalidatePath("/admin/classes");
-  revalidatePath("/admin/students");
-  return { success: true };
-}
-
-/**
  * Admin manually overrides a student's attendance (present ↔ absent).
  * Records who overrode and optionally why — for the audit log.
  */
@@ -388,7 +370,9 @@ export async function overrideStudentAttendance(
   reason?: string,
 ) {
   const supabase = await requireAdmin();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { error } = await supabase.from("attendance").upsert(
     {
