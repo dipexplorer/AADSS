@@ -131,9 +131,16 @@ export default function ProfileClient({ profile, resetRequests = [] }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  const hasPendingRequest = resetRequests.some(
-    (r) => r.status === "pending" || r.status === "approved",
-  );
+  const latestRequest = resetRequests[0];
+  const isPendingRequest = latestRequest?.status === "pending";
+  
+  const cooldownTill = latestRequest
+    ? new Date(new Date(latestRequest.requested_at).getTime() + 30 * 24 * 60 * 60 * 1000)
+    : null;
+  
+  // If we have a cooldown till date, and it's in the future, and the request is NOT pending (i.e. it's approved or rejected), they are in cooldown.
+  // Actually, even if it's pending, they are in cooldown from making ANOTHER request, but the UI should just say "Pending..."
+  const disableResetBtn = isPendingRequest || (cooldownTill && cooldownTill > new Date());
 
   async function handleResetSubmit(e: React.SubmitEvent) {
     e.preventDefault();
@@ -340,10 +347,14 @@ export default function ProfileClient({ profile, resetRequests = [] }: Props) {
               </div>
               <button
                 onClick={() => setShowResetModal(true)}
-                disabled={hasPendingRequest}
+                disabled={disableResetBtn ?? false}
                 className="shrink-0 px-3.5 py-2 text-xs font-semibold rounded-xl border border-border text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {hasPendingRequest ? "Pending…" : "Request Reset"}
+                {isPendingRequest ? "Pending Review" : (
+                  (cooldownTill && cooldownTill > new Date()) 
+                    ? `Cooldown (${Math.ceil((cooldownTill.getTime() - Date.now()) / (1000 * 60 * 60 * 24))}d left)`
+                    : "Request Reset"
+                )}
               </button>
             </div>
           )}

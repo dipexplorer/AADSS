@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   { label: "Students", href: "/admin/students", icon: Users },
   { label: "Classes", href: "/admin/classes", icon: CheckSquare },
   { label: "Eligibility", href: "/admin/defaulters", icon: AlertOctagon },
-  { label: "Security", href: "/admin/security", icon: ShieldAlert },
+  { label: "Devices", href: "/admin/security", icon: ShieldAlert },
 ];
 
 export default function AdminSidebar() {
