@@ -32,7 +32,7 @@ export async function getPendingDeviceResets() {
       reason,
       status,
       requested_at,
-      student_profiles(full_name, roll_number, email)
+      student_profiles(full_name, roll_number)
     `)
     .eq("status", "pending")
     .order("requested_at", { ascending: true });
