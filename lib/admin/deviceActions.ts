@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 
 // ── Helper ── //
@@ -58,8 +59,12 @@ export async function approveDeviceReset(requestId: string, userId: string, prof
   
   // A. Get the user's current Auth metadata (to preserve other fields)
   // To update other users' metadata, we must use the admin/service role.
-  // We use Supabase Admin API to securely update user's identity data.
-  const adminAuthClient = supabase.auth.admin;
+  // We use Supabase Admin API with the Service Role key to securely update user's identity data.
+  const adminClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  const adminAuthClient = adminClient.auth.admin;
   
   const { data: userRecord, error: userError } = await adminAuthClient.getUserById(userId);
   if (userError || !userRecord.user) {
@@ -90,7 +95,7 @@ export async function approveDeviceReset(requestId: string, userId: string, prof
     .from("device_reset_requests")
     .update({
       status: "approved",
-      reviewed_by: session?.user.id,
+      approved_by: session?.user.id,
       reviewed_at: new Date().toISOString()
     })
     .eq("id", requestId);
@@ -112,7 +117,7 @@ export async function rejectDeviceReset(requestId: string, notes: string) {
     .update({
       status: "rejected",
       admin_notes: notes.trim() || null,
-      reviewed_by: user?.id,
+      approved_by: user?.id,
       reviewed_at: new Date().toISOString()
     })
     .eq("id", requestId);
