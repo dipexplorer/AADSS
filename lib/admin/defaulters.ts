@@ -64,113 +64,122 @@ export async function getDefaultersReport(semesterId: string): Promise<{
 
   if (!semesterId) return { data: [], error: null };
 
+  const { data: studentsRaw, error: studErr } = await supabase
+    .from("student_profiles")
+    .select("id, user_id")
+    .eq("semester_id", semesterId);
+
+  if (studErr) return { data: null, error: studErr.message };
+  if (!studentsRaw || studentsRaw.length === 0) return { data: [], error: "No students currently enrolled in this semester." };
+
+  const { data: subjectsRaw, error: subErr } = await supabase
+    .from("subjects")
+    .select(`
+      id,
+      name,
+      min_attendance_required,
+      semesters!inner(semester_number, programs!inner(name))
+    `)
+    .eq("semester_id", semesterId);
+
+  if (subErr) return { data: null, error: subErr.message };
+  if (!subjectsRaw || subjectsRaw.length === 0) return { data: [], error: "No subjects found for this semester." };
+
+  // Fetch Class Sessions for these subjects to know the TOTAL possible classes
+  const { data: sessionsRaw, error: sessErr } = await supabase
+    .from("class_sessions")
+    .select(`
+      id,
+      subject_id,
+      subjects!inner(semester_id)
+    `)
+    .eq("subjects.semester_id", semesterId)
+    .neq("status", "cancelled");
+
+  if (sessErr) return { data: null, error: sessErr.message };
+
+  const subjectTotalSessions: Record<string, number> = {};
+  (subjectsRaw as any[]).forEach((s) => (subjectTotalSessions[s.id] = 0));
+  (sessionsRaw ?? []).forEach((sess) => {
+    if (subjectTotalSessions[sess.subject_id!] !== undefined) {
+      subjectTotalSessions[sess.subject_id!]++;
+    }
+  });
+
+  const totalPossibleSessions = Object.values(subjectTotalSessions).reduce((a, b) => a + b, 0);
+  if (totalPossibleSessions === 0) {
+    return { data: [], error: "No attendance data recorded yet for this semester." };
+  }
+
+  // Fetch attendance records for these sessions
   const { data: attendanceRaw, error: attErr } = await supabase
     .from("attendance")
-    .select(
-      `
+    .select(`
       student_id,
       status,
       class_sessions!inner(
         subject_id,
-        subjects!inner(
-          name,
-          code,
-          min_attendance_required,
-          semester_id,
-          semesters!inner(
-            semester_number,
-            programs!inner(name)
-          )
-        )
+        subjects!inner(semester_id)
       )
-    `,
-    )
+    `)
     .eq("class_sessions.subjects.semester_id", semesterId)
     .neq("status", "cancelled");
 
   if (attErr) return { data: null, error: attErr.message };
-  if (!attendanceRaw || attendanceRaw.length === 0)
-    return { data: [], error: null };
 
-  // Aggregate by student_id + subject_id
-  const agg: Record<
-    string,
-    {
-      student_id: string;
-      subject_id: string;
-      present: number;
-      total: number;
-      subject_name: string;
-      subject_code: string;
-      min_req: number;
-      sem_num: number;
-      prog_name: string;
-    }
-  > = {};
-
-  const uniqueStudentIds = new Set<string>();
-
-  attendanceRaw.forEach((row: any) => {
-    uniqueStudentIds.add(row.student_id);
-    const session = row.class_sessions;
-    if (!session || !session.subjects) return;
-
-    const subj = session.subjects;
-    const sem = subj.semesters;
-    const prog = sem?.programs;
-
-    const key = `${row.student_id}_${session.subject_id}`;
-    if (!agg[key]) {
-      agg[key] = {
-        student_id: row.student_id,
-        subject_id: session.subject_id,
-        present: 0,
-        total: 0,
-        subject_name: subj.name,
-        subject_code: subj.code,
-        min_req: subj.min_attendance_required ?? 75,
-        sem_num: sem?.semester_number ?? 0,
-        prog_name: prog?.name ?? "Unknown",
-      };
-    }
-
-    agg[key].total++;
-    if (row.status === "present") agg[key].present++;
+  // Aggregate Present Counts for each Student -> Subject
+  // We initialize the agg matrix for ALL Students x ALL Subjects
+  const aggMatrix: Record<string, number> = {}; // key: `${student_id}_${subject_id}`
+  
+  (studentsRaw as any[]).forEach((student) => {
+    (subjectsRaw as any[]).forEach((subject) => {
+      aggMatrix[`${student.id}_${subject.id}`] = 0;
+    });
   });
 
-  // Calculate percentages and filter only defaulters (below min_req)
-  const defaulterList: any[] = [];
-  const defaulterStudentIds = new Set<string>();
-
-  Object.values(agg).forEach((subjectAgg) => {
-    if (subjectAgg.total > 0) {
-      const actual_percent = (subjectAgg.present / subjectAgg.total) * 100;
-      if (actual_percent < subjectAgg.min_req) {
-        defaulterList.push({
-          ...subjectAgg,
-          actual_percent: Math.round(actual_percent * 10) / 10,
-        });
-        defaulterStudentIds.add(subjectAgg.student_id);
+  (attendanceRaw ?? []).forEach((att: any) => {
+    // Only count 'present' status towards actual count
+    if (att.status === "present") {
+      const subjId = att.class_sessions.subject_id;
+      const key = `${att.student_id}_${subjId}`;
+      if (aggMatrix[key] !== undefined) {
+        aggMatrix[key]++;
       }
     }
   });
 
-  if (defaulterList.length === 0) return { data: [], error: null };
-
-  // Resolve Student Names & Emails
-  const { data: studentProfiles } = await supabase
-    .from("student_profiles")
-    .select("id, user_id")
-    .in("id", Array.from(defaulterStudentIds));
-
-  const profileMap: Record<string, string> = {};
-  const userIdsList: string[] = [];
-  (studentProfiles ?? []).forEach((sp) => {
-    profileMap[sp.id] = sp.user_id;
-    if (sp.user_id) userIdsList.push(sp.user_id);
+  // Build the final records
+  const allRecords: any[] = [];
+  
+  (studentsRaw as any[]).forEach((student) => {
+    (subjectsRaw as any[]).forEach((subject) => {
+      const total = subjectTotalSessions[subject.id];
+      if (total > 0) {
+        const present = aggMatrix[`${student.id}_${subject.id}`];
+        const actual_percent = (present / total) * 100;
+        
+        allRecords.push({
+          student_id: student.id,
+          user_id: student.user_id,
+          subject_name: subject.name,
+          subject_code: subject.code || "N/A",
+          min_required_percent: subject.min_attendance_required ?? 75,
+          actual_percent: Math.round(actual_percent * 10) / 10,
+          present_count: present,
+          total_count: total,
+          semester_number: subject.semesters?.semester_number ?? 0,
+          program_name: subject.semesters?.programs?.name ?? "Unknown",
+        });
+      }
+    });
   });
 
+  if (allRecords.length === 0) return { data: [], error: null };
+
+  // Resolve Student Names & Emails from userMap
+  const userIdsList = studentsRaw.map((s) => s.user_id).filter(Boolean);
   let userMap: Record<string, { email: string; full_name: string }> = {};
+
   if (userIdsList.length > 0) {
     const { data: usersInfo } = await (supabase as any).rpc("get_users_info", {
       user_ids: userIdsList,
@@ -180,9 +189,8 @@ export async function getDefaultersReport(semesterId: string): Promise<{
     });
   }
 
-  const finalRecords: DefaulterRecord[] = defaulterList.map((d) => {
-    const uId = profileMap[d.student_id];
-    const userInfo = userMap[uId] ?? {
+  const finalRecords: DefaulterRecord[] = allRecords.map((d: any) => {
+    const userInfo = userMap[d.user_id] ?? {
       email: "Unknown",
       full_name: "Unknown Student",
     };
@@ -190,18 +198,18 @@ export async function getDefaultersReport(semesterId: string): Promise<{
       student_id: d.student_id,
       student_name: userInfo.full_name,
       student_email: userInfo.email,
-      program_name: d.prog_name,
-      semester_number: d.sem_num,
+      program_name: d.program_name,
+      semester_number: d.semester_number,
       subject_name: d.subject_name,
       subject_code: d.subject_code,
-      min_required_percent: d.min_req,
+      min_required_percent: d.min_required_percent,
       actual_percent: d.actual_percent,
-      present_count: d.present,
-      total_count: d.total,
+      present_count: d.present_count,
+      total_count: d.total_count,
     };
   });
 
-  // Sort by biggest deficit first
+  // Sort by biggest deficit first so defaulters appear prominently in processing
   finalRecords.sort((a, b) => {
     const deficitA = a.min_required_percent - a.actual_percent;
     const deficitB = b.min_required_percent - b.actual_percent;

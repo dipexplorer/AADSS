@@ -172,6 +172,15 @@ export default function DefaultersClient({
     window.print();
   };
 
+  // Filter students who have at least ONE shortfall for the Print Notice
+  const printStudents = useMemo(() => {
+    return groupedStudents.filter((s) => {
+      return Object.values(s.subjects).some(
+        (stats) => stats.actual < stats.required,
+      );
+    });
+  }, [groupedStudents]);
+
   if (error) {
     return (
       <div className="p-8 flex items-center justify-center text-red-500 font-medium">
@@ -181,203 +190,233 @@ export default function DefaultersClient({
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in">
-      {/* HEADER */}
-      <div className="print:hidden flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <AlertOctagon className="w-8 h-8 text-red-500" />
-            Decision Support System
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Exam Eligibility & Shortfall Tracking
-          </p>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:bg-white pb-20">
+      {/* ── DASHBOARD-ONLY UI ── */}
+      <div className="print:hidden space-y-6">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-zinc-200 pb-6">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-zinc-900">
+              Exam Eligibility & Attendance Dashboard
+            </h1>
+            <p className="text-sm text-zinc-500">
+              Subject-wise Attendance Snapshot
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handlePrint}
+              className="gap-2 shadow-none border-zinc-300"
+            >
+              <Printer className="w-4 h-4" />
+              Print Official Notice
+            </Button>
+            <Button
+              onClick={handleExportCSV}
+              className="gap-2 bg-zinc-900 border-zinc-900 text-white shadow-none"
+            >
+              <Download className="w-4 h-4" />
+              Download CSV
+            </Button>
+          </div>
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={handlePrint} className="gap-2">
-            <Printer className="w-4 h-4" />
-            Print PDF
-          </Button>
-          <Button
-            onClick={handleExportCSV}
-            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
-
-      <div className="print:hidden flex items-center gap-3 p-3 bg-muted/30 border border-border/50 rounded-xl">
-        <GraduationCap className="w-4 h-4 text-muted-foreground shrink-0" />
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-          Semester Report:
-        </span>
-        <div className="flex flex-wrap gap-2">
+        {/* SEMESTER STRIP */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2">
           {semesters.map((sem) => (
             <button
               key={sem.id}
               onClick={() =>
                 router.push(`/admin/defaulters?semester=${sem.id}`)
               }
-              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+              className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-semibold border transition-none ${
                 selectedSemesterId === sem.id
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-border hover:bg-muted"
+                  ? "bg-zinc-900 text-white border-zinc-900"
+                  : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
               }`}
             >
-              {sem.program_name} — Sem {sem.semester_number}
+              {sem.program_name} — S{sem.semester_number}
             </button>
           ))}
         </div>
+
+        {/* FILTERS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search candidate..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:border-zinc-400"
+            />
+          </div>
+          <select
+            value={selectedProgram}
+            onChange={(e) => {
+              setSelectedProgram(e.target.value);
+              setSelectedSubject("All");
+            }}
+            className="px-3 py-2 border border-zinc-200 rounded-md text-sm bg-white outline-none"
+          >
+            <option value="All">All Programs</option>
+            {uniquePrograms.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value)}
+            className="px-3 py-2 border border-zinc-200 rounded-md text-sm bg-white outline-none"
+          >
+            <option value="All">All Subjects</option>
+            {uniqueSubjects.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div className="print:hidden grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search student..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-border rounded-xl bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-          />
+      {/* ── OFFICIAL ACADEMIC NOTICE (PRINT ONLY) ── */}
+      <div
+        className="hidden print:block text-black bg-white print:p-8"
+        style={{ fontFamily: "sans-serif", lineHeight: "1.2" }}
+      >
+        <style
+          dangerouslySetInnerHTML={{
+            __html: "@page { size: auto; margin: 0mm; }",
+          }}
+        />
+
+        <div className="text-center mb-3">
+          <h2 className="text-sm font-normal mb-3">
+            Attendance Eligibility Report
+          </h2>
+
+          <div className="text-xs text-left mb-2">
+            <span>
+              Program:{" "}
+              {selectedProgram === "All"
+                ? semesters.find((s) => s.id === selectedSemesterId)
+                    ?.program_name
+                : selectedProgram}
+            </span>
+            {selectedSubject !== "All" && (
+              <span className="ml-4">Subject: {selectedSubject}</span>
+            )}
+          </div>
         </div>
 
-        <select
-          value={selectedProgram}
-          onChange={(e) => setSelectedProgram(e.target.value)}
-          className="w-full px-4 py-2 border border-border rounded-xl bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm appearance-none"
+        <table
+          className="w-full text-center border-collapse"
+          style={{ fontSize: "10px" }}
         >
-          <option value="All">All Programs & Semesters</option>
-          {uniquePrograms.map((prog) => (
-            <option key={prog} value={prog}>
-              {prog}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={selectedSubject}
-          onChange={(e) => setSelectedSubject(e.target.value)}
-          className="w-full px-4 py-2 border border-border rounded-xl bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm appearance-none"
-        >
-          <option value="All">All Subjects</option>
-          {uniqueSubjects.map((sub) => (
-            <option key={sub} value={sub}>
-              {sub}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* PRINT HEADER FOR PDF ONLY */}
-      <div className="hidden print:flex flex-col items-center justify-center mb-8 text-center border-b pb-6 border-black mx-auto w-full max-w-4xl">
-        {selectedProgram !== "All" && (
-          <h3 className="text-xl font-bold text-black mb-1">
-            Program: {selectedProgram.replace(" - Sem", " with semester")}
-          </h3>
-        )}
-        {selectedSubject !== "All" && (
-          <h3 className="text-lg font-bold text-gray-800">
-            Subject: {selectedSubject}
-          </h3>
-        )}
-
-        <p className="text-base font-semibold text-red-600 mt-4">
-          Confidential: Candidate wise shortfall analysis
-        </p>
-      </div>
-
-      {/* DYNAMIC PIPVOT TABLE */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden print:border-none print:shadow-none print:w-[90%] print:mx-auto">
-        <div className="overflow-x-auto print:overflow-visible">
-          <table className="w-full text-sm text-left print:text-center whitespace-nowrap">
-            <thead className="bg-accent/50 text-muted-foreground font-medium border-b border-border print:bg-transparent print:border-b-2 print:border-black print:text-black">
-              <tr>
-                <th className="px-4 py-4 print:text-center sticky left-0 bg-card/90 backdrop-blur z-10 print:static print:bg-transparent border-r border-border/50">
-                  Student Details
+          <thead>
+            <tr className="border-b border-black">
+              <th className="py-1 px-1 text-left w-8 font-normal">#</th>
+              <th className="py-1 px-2 text-left font-normal">Student Name</th>
+              {activeSubjectCols.map((col) => (
+                <th key={col} className="py-1 px-1 font-normal">
+                  {col}
                 </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {printStudents.length === 0 ? (
+              <tr>
+                <td colSpan={activeSubjectCols.length + 2} className="py-2">
+                  No shortfalls reported.
+                </td>
+              </tr>
+            ) : (
+              printStudents.map((s, idx) => (
+                <tr key={s.student_id}>
+                  <td className="py-1 px-1 text-left">{idx + 1}</td>
+                  <td className="py-1 px-2 text-left">{s.student_name}</td>
+                  {activeSubjectCols.map((col) => {
+                    const subj = s.subjects[col];
+                    return (
+                      <td key={col} className="py-1 px-1">
+                        {subj ? `${subj.actual}%` : "-"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-                {/* Dynamically Generate Columns for EACH Subject */}
+      {/* ── DASHBOARD TABLE (NON-PRINT) ── */}
+      <div className="print:hidden bg-white border border-zinc-200 rounded-lg overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left border-collapse">
+            <thead className="bg-zinc-50 border-b border-zinc-200 text-zinc-500">
+              <tr>
+                <th className="px-3 py-3 font-bold border-r border-zinc-100 min-w-[150px]">
+                  Candidate Profile
+                </th>
                 {activeSubjectCols.map((col) => (
                   <th
                     key={col}
-                    className="px-4 py-3 text-center border-r border-border/50 last:border-r-0 min-w-[120px]"
+                    className="px-1 py-3 text-center font-bold border-r border-zinc-100 last:border-r-0"
                   >
-                    <div className="font-semibold text-foreground print:text-black whitespace-normal line-clamp-2 leading-tight">
+                    <div
+                      className="truncate w-24 mx-auto text-[10px]"
+                      title={col}
+                    >
                       {col}
                     </div>
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody>
-              {groupedStudents.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={activeSubjectCols.length + 2}
-                    className="px-4 py-12 text-center text-muted-foreground"
-                  >
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="bg-green-100/50 dark:bg-green-900/20 p-3 rounded-full mb-3">
-                        <AlertOctagon className="w-6 h-6 text-green-500" />
-                      </div>
-                      <p className="text-base font-medium text-foreground">
-                        No Shortfalls Found!
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        All tracked students meet their minimum attendance
-                        thresholds.
-                      </p>
+            <tbody className="divide-y divide-zinc-100">
+              {groupedStudents.map((s) => (
+                <tr
+                  key={s.student_id}
+                  className="hover:bg-zinc-50 border-b border-zinc-100"
+                >
+                  <td className="px-3 py-2 border-r border-zinc-100">
+                    <div className="font-bold text-zinc-800 uppercase text-xs">
+                      {s.student_name}
+                    </div>
+                    <div className="text-[9px] text-zinc-400">
+                      {s.student_email}
                     </div>
                   </td>
+                  {activeSubjectCols.map((col) => {
+                    const subj = s.subjects[col];
+                    const isShortfall = subj && subj.actual < subj.required;
+                    return (
+                      <td
+                        key={col}
+                        className="px-1 py-2 text-center border-r border-zinc-100 last:border-r-0"
+                      >
+                        {subj ? (
+                          <div
+                            className={`font-bold text-xs ${isShortfall ? "text-red-600 bg-red-50 rounded py-0.5" : "text-zinc-600"}`}
+                          >
+                            {subj.actual}%
+                            <div className="text-[7px] opacity-50 font-normal">
+                              Min: {subj.required}%
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-zinc-200">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
-              ) : (
-                groupedStudents.map((s, idx) => (
-                  <tr
-                    key={s.student_id}
-                    className="border-b border-border/50 hover:bg-accent/20 transition-colors group print:border-black/40"
-                  >
-                    {/* Student Identity */}
-                    <td className="px-4 py-4 print:text-center sticky left-0 bg-card group-hover:bg-accent/20 z-10 print:static print:bg-transparent border-r border-border/50">
-                      <div className="font-bold text-foreground print:text-black print:text-lg">
-                        {s.student_name}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground print:text-gray-600 print:text-sm">
-                        {s.student_email}
-                      </div>
-                    </td>
-
-                    {/* Dedicated Cells for each subject column */}
-                    {activeSubjectCols.map((col) => {
-                      const subj = s.subjects[col];
-                      return (
-                        <td
-                          key={col}
-                          className="px-4 py-4 text-center border-r border-border/50 last:border-r-0"
-                        >
-                          {subj ? (
-                            <div className="flex flex-col items-center justify-center gap-1">
-                              <span className="font-bold text-red-600 text-[15px] leading-none print:text-black print:text-base">
-                                -{subj.deficit}%
-                              </span>
-                              <span className="text-[11px] text-muted-foreground font-medium print:hidden leading-none">
-                                Act: {subj.actual}%
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center text-muted-foreground/30 print:text-gray-400">
-                              -
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>

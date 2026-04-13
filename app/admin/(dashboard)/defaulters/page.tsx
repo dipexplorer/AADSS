@@ -11,12 +11,15 @@ export const metadata = {
 export default async function AdminDefaultersPage({
   searchParams,
 }: {
-  searchParams: { semester?: string };
+  searchParams: Promise<{ semester?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const semestersResult = await getAvailableSemesters();
   const availableSemesters = semestersResult.data ?? [];
+  
   const selectedSemesterId =
-    searchParams.semester ?? availableSemesters[0]?.id ?? "";
+    resolvedSearchParams.semester ?? availableSemesters[0]?.id ?? "";
+    
   const { data, error } = selectedSemesterId
     ? await getDefaultersReport(selectedSemesterId)
     : { data: [], error: null };
