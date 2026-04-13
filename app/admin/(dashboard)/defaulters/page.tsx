@@ -1,8 +1,32 @@
-import { getDefaultersReport } from "@/lib/admin/defaulters";
+import {
+  getAvailableSemesters,
+  getDefaultersReport,
+} from "@/lib/admin/defaulters";
 import DefaultersClient from "./components/DefaultersClient";
 
-export default async function AdminDefaultersPage() {
-  const { data, error } = await getDefaultersReport();
+export const metadata = {
+  title: "Eligibility Report | Admin Panel",
+};
 
-  return <DefaultersClient data={data ?? []} error={error} />;
+export default async function AdminDefaultersPage({
+  searchParams,
+}: {
+  searchParams: { semester?: string };
+}) {
+  const semestersResult = await getAvailableSemesters();
+  const availableSemesters = semestersResult.data ?? [];
+  const selectedSemesterId =
+    searchParams.semester ?? availableSemesters[0]?.id ?? "";
+  const { data, error } = selectedSemesterId
+    ? await getDefaultersReport(selectedSemesterId)
+    : { data: [], error: null };
+
+  return (
+    <DefaultersClient
+      data={data ?? []}
+      error={error}
+      semesters={availableSemesters}
+      selectedSemesterId={selectedSemesterId}
+    />
+  );
 }

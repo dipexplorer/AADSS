@@ -1,23 +1,29 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { DefaulterRecord } from "@/lib/admin/defaulters";
+import { useRouter } from "next/navigation";
+import { DefaulterRecord, SemesterOption } from "@/lib/admin/defaulters";
 import {
   Download,
   Search,
   AlertOctagon,
   Printer,
-  CheckCircle2,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function DefaultersClient({
   data,
   error,
+  semesters,
+  selectedSemesterId,
 }: {
   data: DefaulterRecord[];
   error: string | null;
+  semesters: SemesterOption[];
+  selectedSemesterId: string;
 }) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("All");
   const [selectedProgram, setSelectedProgram] = useState("All");
@@ -92,7 +98,9 @@ export default function DefaultersClient({
 
     filteredData.forEach((d) => {
       if (!map.has(d.student_id)) {
-        const fallBackName = d.student_name || (d.student_email ? d.student_email.split('@')[0] : "Student");
+        const fallBackName =
+          d.student_name ||
+          (d.student_email ? d.student_email.split("@")[0] : "Student");
         map.set(d.student_id, {
           student_id: d.student_id,
           student_name: fallBackName,
@@ -198,6 +206,30 @@ export default function DefaultersClient({
             <Download className="w-4 h-4" />
             Export CSV
           </Button>
+        </div>
+      </div>
+
+      <div className="print:hidden flex items-center gap-3 p-3 bg-muted/30 border border-border/50 rounded-xl">
+        <GraduationCap className="w-4 h-4 text-muted-foreground shrink-0" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+          Semester Report:
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {semesters.map((sem) => (
+            <button
+              key={sem.id}
+              onClick={() =>
+                router.push(`/admin/defaulters?semester=${sem.id}`)
+              }
+              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                selectedSemesterId === sem.id
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background border-border hover:bg-muted"
+              }`}
+            >
+              {sem.program_name} — Sem {sem.semester_number}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -328,12 +360,12 @@ export default function DefaultersClient({
                         >
                           {subj ? (
                             <div className="flex flex-col items-center justify-center gap-1">
-                                <span className="font-bold text-red-600 text-[15px] leading-none print:text-black print:text-base">
-                                  -{subj.deficit}%
-                                </span>
-                                <span className="text-[11px] text-muted-foreground font-medium print:hidden leading-none">
-                                  Act: {subj.actual}%
-                                </span>
+                              <span className="font-bold text-red-600 text-[15px] leading-none print:text-black print:text-base">
+                                -{subj.deficit}%
+                              </span>
+                              <span className="text-[11px] text-muted-foreground font-medium print:hidden leading-none">
+                                Act: {subj.actual}%
+                              </span>
                             </div>
                           ) : (
                             <div className="flex flex-col items-center justify-center text-muted-foreground/30 print:text-gray-400">

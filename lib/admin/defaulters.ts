@@ -16,7 +16,41 @@ export interface DefaulterRecord {
   total_count: number;
 }
 
-export async function getDefaultersReport(): Promise<{
+export interface SemesterOption {
+  id: string;
+  semester_number: number;
+  program_name: string;
+}
+
+export async function getAvailableSemesters(): Promise<{
+  data: SemesterOption[] | null;
+  error: string | null;
+}> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || user.app_metadata?.role !== "admin") {
+    return { data: null, error: "Unauthorized" };
+  }
+
+  const { data, error } = await supabase
+    .from("semesters")
+    .select("id, semester_number, programs(name)")
+    .order("semester_number");
+
+  if (error) return { data: null, error: error.message };
+
+  const formatted = (data ?? []).map((s: any) => ({
+    id: s.id,
+    semester_number: s.semester_number,
+    program_name: s.programs?.name ?? "Unknown",
+  }));
+
+  return { data: formatted, error: null };
+}
+
+export async function getDefaultersReport(semesterId: string): Promise<{
   data: DefaulterRecord[] | null;
   error: string | null;
 }> {
@@ -24,15 +58,16 @@ export async function getDefaultersReport(): Promise<{
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user || user.app_metadata?.role !== "admin") {
     return { data: null, error: "Unauthorized" };
   }
 
-  // Fetch all attendance records that validly count towards percentage
+  if (!semesterId) return { data: [], error: null };
+
   const { data: attendanceRaw, error: attErr } = await supabase
     .from("attendance")
-    .select(`
+    .select(
+      `
       student_id,
       status,
       class_sessions!inner(
@@ -41,19 +76,21 @@ export async function getDefaultersReport(): Promise<{
           name,
           code,
           min_attendance_required,
+          semester_id,
           semesters!inner(
             semester_number,
             programs!inner(name)
           )
         )
       )
-    `)
+    `,
+    )
+    .eq("class_sessions.subjects.semester_id", semesterId)
     .neq("status", "cancelled");
 
-  if (attErr) {
-    return { data: null, error: attErr.message };
-  }
-  if (!attendanceRaw) return { data: [], error: null };
+  if (attErr) return { data: null, error: attErr.message };
+  if (!attendanceRaw || attendanceRaw.length === 0)
+    return { data: [], error: null };
 
   // Aggregate by student_id + subject_id
   const agg: Record<
@@ -101,12 +138,11 @@ export async function getDefaultersReport(): Promise<{
     if (row.status === "present") agg[key].present++;
   });
 
-  // Calculate percentages and filter defaulters
+  // Calculate percentages and filter only defaulters (below min_req)
   const defaulterList: any[] = [];
   const defaulterStudentIds = new Set<string>();
 
   Object.values(agg).forEach((subjectAgg) => {
-    // Only count if total > 0
     if (subjectAgg.total > 0) {
       const actual_percent = (subjectAgg.present / subjectAgg.total) * 100;
       if (actual_percent < subjectAgg.min_req) {
@@ -119,28 +155,25 @@ export async function getDefaultersReport(): Promise<{
     }
   });
 
-  if (defaulterList.length === 0) {
-    return { data: [], error: null };
-  }
+  if (defaulterList.length === 0) return { data: [], error: null };
 
-  // Resolve Student Profiles & Auth details to attach Names/Emails
+  // Resolve Student Names & Emails
   const { data: studentProfiles } = await supabase
     .from("student_profiles")
     .select("id, user_id")
     .in("id", Array.from(defaulterStudentIds));
 
   const profileMap: Record<string, string> = {};
-  const userIds: string[] = [];
-
+  const userIdsList: string[] = [];
   (studentProfiles ?? []).forEach((sp) => {
     profileMap[sp.id] = sp.user_id;
-    if (sp.user_id) userIds.push(sp.user_id);
+    if (sp.user_id) userIdsList.push(sp.user_id);
   });
 
   let userMap: Record<string, { email: string; full_name: string }> = {};
-  if (userIds.length > 0) {
+  if (userIdsList.length > 0) {
     const { data: usersInfo } = await (supabase as any).rpc("get_users_info", {
-      user_ids: userIds,
+      user_ids: userIdsList,
     });
     (usersInfo ?? []).forEach((u: any) => {
       userMap[u.id] = { email: u.email, full_name: u.full_name };
@@ -149,8 +182,10 @@ export async function getDefaultersReport(): Promise<{
 
   const finalRecords: DefaulterRecord[] = defaulterList.map((d) => {
     const uId = profileMap[d.student_id];
-    const userInfo = userMap[uId] ?? { email: "Unknown", full_name: "Unknown Student" };
-
+    const userInfo = userMap[uId] ?? {
+      email: "Unknown",
+      full_name: "Unknown Student",
+    };
     return {
       student_id: d.student_id,
       student_name: userInfo.full_name,
@@ -166,11 +201,11 @@ export async function getDefaultersReport(): Promise<{
     };
   });
 
-  // Sort by biggest deficit
+  // Sort by biggest deficit first
   finalRecords.sort((a, b) => {
     const deficitA = a.min_required_percent - a.actual_percent;
     const deficitB = b.min_required_percent - b.actual_percent;
-    return deficitB - deficitA; // Descending deficit
+    return deficitB - deficitA;
   });
 
   return { data: finalRecords, error: null };
