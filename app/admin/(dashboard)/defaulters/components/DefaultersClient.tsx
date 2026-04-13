@@ -181,14 +181,6 @@ export default function DefaultersClient({
     });
   }, [groupedStudents]);
 
-  if (error) {
-    return (
-      <div className="p-8 flex items-center justify-center text-red-500 font-medium">
-        Error loading report: {error}
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:bg-white pb-20">
       {/* ── DASHBOARD-ONLY UI ── */}
@@ -206,6 +198,7 @@ export default function DefaultersClient({
             <Button
               variant="outline"
               onClick={handlePrint}
+              disabled={!!error || groupedStudents.length === 0}
               className="gap-2 shadow-none border-zinc-300"
             >
               <Printer className="w-4 h-4" />
@@ -213,7 +206,8 @@ export default function DefaultersClient({
             </Button>
             <Button
               onClick={handleExportCSV}
-              className="gap-2 bg-zinc-900 border-zinc-900 text-white shadow-none"
+              disabled={!!error || groupedStudents.length === 0}
+              className="gap-2 bg-zinc-900 border-zinc-900 text-white shadow-none hover:bg-zinc-800"
             >
               <Download className="w-4 h-4" />
               Download CSV
@@ -240,46 +234,62 @@ export default function DefaultersClient({
           ))}
         </div>
 
-        {/* FILTERS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-            <input
-              type="text"
-              placeholder="Search candidate..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:border-zinc-400"
-            />
+        {error ? (
+          <div className="p-12 mt-8 border border-red-200 bg-red-50/50 rounded-xl flex flex-col items-center justify-center text-center">
+            <AlertOctagon className="w-8 h-8 text-red-500 mb-3" />
+            <h3 className="text-lg font-semibold text-red-700">No Data Available</h3>
+            <p className="text-sm text-red-600/80 mt-1">{error}</p>
           </div>
-          <select
-            value={selectedProgram}
-            onChange={(e) => {
-              setSelectedProgram(e.target.value);
-              setSelectedSubject("All");
-            }}
-            className="px-3 py-2 border border-zinc-200 rounded-md text-sm bg-white outline-none"
-          >
-            <option value="All">All Programs</option>
-            {uniquePrograms.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value)}
-            className="px-3 py-2 border border-zinc-200 rounded-md text-sm bg-white outline-none"
-          >
-            <option value="All">All Subjects</option>
-            {uniqueSubjects.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
+        ) : groupedStudents.length === 0 ? (
+          <div className="p-12 mt-8 border border-zinc-200 bg-zinc-50/50 rounded-xl flex flex-col items-center justify-center text-center">
+            <GraduationCap className="w-8 h-8 text-zinc-400 mb-3" />
+            <h3 className="text-lg font-semibold text-zinc-700">No Candidates Found</h3>
+            <p className="text-sm text-zinc-500 mt-1">Try adjusting your filters or changing the active semester.</p>
+          </div>
+        ) : (
+          <>
+            {/* FILTERS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Search candidate..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-zinc-200 rounded-md text-sm focus:outline-none focus:border-zinc-400"
+                />
+              </div>
+              <select
+                value={selectedProgram}
+                onChange={(e) => {
+                  setSelectedProgram(e.target.value);
+                  setSelectedSubject("All");
+                }}
+                className="px-3 py-2 border border-zinc-200 rounded-md text-sm bg-white outline-none"
+              >
+                <option value="All">All Programs</option>
+                {uniquePrograms.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="px-3 py-2 border border-zinc-200 rounded-md text-sm bg-white outline-none"
+              >
+                <option value="All">All Subjects</option>
+                {uniqueSubjects.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── OFFICIAL ACADEMIC NOTICE (PRINT ONLY) ── */}
@@ -355,72 +365,74 @@ export default function DefaultersClient({
       </div>
 
       {/* ── DASHBOARD TABLE (NON-PRINT) ── */}
-      <div className="print:hidden bg-white border border-zinc-200 rounded-lg overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead className="bg-zinc-50 border-b border-zinc-200 text-zinc-500">
-              <tr>
-                <th className="px-3 py-3 font-bold border-r border-zinc-100 min-w-[150px]">
-                  Candidate Profile
-                </th>
-                {activeSubjectCols.map((col) => (
-                  <th
-                    key={col}
-                    className="px-1 py-3 text-center font-bold border-r border-zinc-100 last:border-r-0"
-                  >
-                    <div
-                      className="truncate w-24 mx-auto text-[10px]"
-                      title={col}
-                    >
-                      {col}
-                    </div>
+      {!error && groupedStudents.length > 0 && (
+        <div className="print:hidden bg-white border border-zinc-200 rounded-lg overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-zinc-50 border-b border-zinc-200 text-zinc-500">
+                <tr>
+                  <th className="px-3 py-3 font-bold border-r border-zinc-100 min-w-[150px]">
+                    Candidate Profile
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {groupedStudents.map((s) => (
-                <tr
-                  key={s.student_id}
-                  className="hover:bg-zinc-50 border-b border-zinc-100"
-                >
-                  <td className="px-3 py-2 border-r border-zinc-100">
-                    <div className="font-bold text-zinc-800 uppercase text-xs">
-                      {s.student_name}
-                    </div>
-                    <div className="text-[9px] text-zinc-400">
-                      {s.student_email}
-                    </div>
-                  </td>
-                  {activeSubjectCols.map((col) => {
-                    const subj = s.subjects[col];
-                    const isShortfall = subj && subj.actual < subj.required;
-                    return (
-                      <td
-                        key={col}
-                        className="px-1 py-2 text-center border-r border-zinc-100 last:border-r-0"
+                  {activeSubjectCols.map((col) => (
+                    <th
+                      key={col}
+                      className="px-1 py-3 text-center font-bold border-r border-zinc-100 last:border-r-0"
+                    >
+                      <div
+                        className="truncate w-24 mx-auto text-[10px]"
+                        title={col}
                       >
-                        {subj ? (
-                          <div
-                            className={`font-bold text-xs ${isShortfall ? "text-red-600 bg-red-50 rounded py-0.5" : "text-zinc-600"}`}
-                          >
-                            {subj.actual}%
-                            <div className="text-[7px] opacity-50 font-normal">
-                              Min: {subj.required}%
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-zinc-200">—</span>
-                        )}
-                      </td>
-                    );
-                  })}
+                        {col}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {groupedStudents.map((s) => (
+                  <tr
+                    key={s.student_id}
+                    className="hover:bg-zinc-50 border-b border-zinc-100"
+                  >
+                    <td className="px-3 py-2 border-r border-zinc-100">
+                      <div className="font-bold text-zinc-800 uppercase text-xs">
+                        {s.student_name}
+                      </div>
+                      <div className="text-[9px] text-zinc-400">
+                        {s.student_email}
+                      </div>
+                    </td>
+                    {activeSubjectCols.map((col) => {
+                      const subj = s.subjects[col];
+                      const isShortfall = subj && subj.actual < subj.required;
+                      return (
+                        <td
+                          key={col}
+                          className="px-1 py-2 text-center border-r border-zinc-100 last:border-r-0"
+                        >
+                          {subj ? (
+                            <div
+                              className={`font-bold text-xs ${isShortfall ? "text-red-600 bg-red-50 rounded py-0.5" : "text-zinc-600"}`}
+                            >
+                              {subj.actual}%
+                              <div className="text-[7px] opacity-50 font-normal">
+                                Min: {subj.required}%
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-zinc-200">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

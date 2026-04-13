@@ -27,6 +27,8 @@ export default async function AdminDashboardPage() {
     { count: classCount },
     { data: todayClasses }
   ] = await Promise.all([
+    // Suppressing TS error as types are out of sync with DB (status column exists)
+    // @ts-ignore
     supabase.from("academic_sessions").select("id, name, status").order("start_date", { ascending: false }),
     supabase.from("student_profiles").select("*", { count: "exact", head: true }),
     supabase.from("programs").select("*", { count: "exact", head: true }),
@@ -42,7 +44,7 @@ export default async function AdminDashboardPage() {
       .order("start_time")
   ]);
 
-  const currentSession = activeSessions?.find((s) => s.status === 'active') || activeSessions?.[0];
+  const currentSession = (activeSessions as any[])?.find((s) => s.status === 'active') || (activeSessions as any[])?.[0];
 
   // Quick Actions
   const quickActions = [
@@ -117,7 +119,7 @@ export default async function AdminDashboardPage() {
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <CheckCircle2 className="w-16 h-16 text-amber-500" />
           </div>
-          <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 text-emerald-600">Classes Today</p>
+          <p className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-2">Classes Today</p>
           <div className="flex items-end gap-3">
             <h2 className="text-4xl font-black text-zinc-900 dark:text-zinc-50">{classCount ?? 0}</h2>
             <span className="text-xs font-medium text-amber-600 flex items-center mb-1 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">Scheduled</span>
@@ -147,7 +149,7 @@ export default async function AdminDashboardPage() {
                     scheduled: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
                     completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
                   };
-                  const colorClass = statusColors[cls.status] || "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+                  const colorClass = cls.status ? statusColors[cls.status] : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
 
                   return (
                     <div key={cls.id || i} className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
