@@ -411,20 +411,28 @@ export async function getClassSessionRoster(classSessionId: string) {
   const semesterId = (session.subjects as any).semester_id;
   if (!semesterId) return { error: "Could not map class to a semester" };
 
+  /* 
+   * FIX: Hum un students ko fetch karenge jo:
+   * 1. Ya toh is semester mein CURRENTLY hain (New students / current sem)
+   * 2. Ya jinka is class session mein pehle se attendance record hai (Historical data)
+   */
   const { data: students, error: studErr } = await supabase
     .from("student_profiles")
     .select(`
       id,
       full_name,
       roll_number,
-      attendance (
+      semester_id,
+      attendance!left (
         status,
         marked_at,
         overridden_by
       )
     `)
-    .eq("semester_id", semesterId)
-    .eq("attendance.class_session_id", classSessionId);
+    // Filter attendance to ONLY this specific session
+    .eq("attendance.class_session_id", classSessionId)
+    // Filter profiles: Current Sem OR Already marked in this class
+    .or(`semester_id.eq.${semesterId},id.in.(SELECT student_id FROM attendance WHERE class_session_id='${classSessionId}')`);
 
   if (studErr) {
     return { error: studErr.message };

@@ -10,6 +10,7 @@ export default async function AdminStudentsPage() {
     .select(`
       id,
       user_id,
+      semester_id,
       created_at,
       academic_sessions(name),
       programs(name),
@@ -31,18 +32,59 @@ export default async function AdminStudentsPage() {
     });
   }
 
-  // Fetch real attendance counts (excluding cancelled sessions)
+  // ─────────────────────────────────────────────────────────────────────────
+  //  CURRENT SEMESTER ATTENDANCE CALCULATION
+  //
+  //  TEACHING: Pehla code galat tha kyunki wo sabki saari attendance ek
+  //  saath ginta tha (Sem1 + Sem2 + Sem3... sab milakar).
+  //
+  //  Sahi tarika: Chain follow karo:
+  //  student_profiles.semester_id
+  //      ↓
+  //  subjects.semester_id  (is semester mein jo subjects padhaye gaye)
+  //      ↓
+  //  class_sessions.subject_id  (un subjects ki classes)
+  //      ↓
+  //  attendance.class_session_id  (un classes ki attendance)
+  //
+  //  Is tarah sirf "Current Semester" ki classes ki attendance count hogi.
+  // ─────────────────────────────────────────────────────────────────────────
   const studentIds = studentList.map((s) => s.id);
   let attendanceCounts: Record<string, { present: number; total: number }> = {};
 
   if (studentIds.length > 0) {
-    const { data: attendanceData } = await supabase
+    // Step 1: Fetch attendance WITH the joined class_session and subject data
+    // so we can match each attendance record to a semester
+    const { data: attendanceData } = await (supabase as any)
       .from("attendance")
-      .select("student_id, status")
+      .select(`
+        student_id,
+        status,
+        class_sessions (
+          subject_id,
+          subjects (
+            semester_id
+          )
+        )
+      `)
       .in("student_id", studentIds)
       .neq("status", "cancelled");
 
-    (attendanceData ?? []).forEach((a) => {
+    // Step 2: Build a map of student_id → semester_id (current semester)
+    const studentSemMap: Record<string, string> = {};
+    studentList.forEach((s) => {
+      studentSemMap[s.id] = s.semester_id;
+    });
+
+    // Step 3: Count only attendance rows where the class's semester_id
+    // matches the student's CURRENT semester_id
+    (attendanceData ?? []).forEach((a: any) => {
+      const classSemesterId = a.class_sessions?.subjects?.semester_id;
+      const studentCurrentSemId = studentSemMap[a.student_id];
+
+      // Only count if this class belongs to student's current semester
+      if (!classSemesterId || classSemesterId !== studentCurrentSemId) return;
+
       if (!attendanceCounts[a.student_id]) {
         attendanceCounts[a.student_id] = { present: 0, total: 0 };
       }

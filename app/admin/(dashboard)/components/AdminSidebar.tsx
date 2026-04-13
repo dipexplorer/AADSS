@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   Loader2,
   AlertOctagon,
+  GraduationCap,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -26,7 +27,7 @@ const NAV_ITEMS = [
   { label: "Students", href: "/admin/students", icon: Users },
   { label: "Classes", href: "/admin/classes", icon: CheckSquare },
   { label: "Eligibility", href: "/admin/defaulters", icon: AlertOctagon },
-  { label: "Devices", href: "/admin/security", icon: ShieldAlert },
+  { label: "Promotions", href: "/admin/promotions", icon: GraduationCap },
 ];
 
 export default function AdminSidebar() {
