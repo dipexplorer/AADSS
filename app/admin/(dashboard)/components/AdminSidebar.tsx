@@ -17,11 +17,13 @@ import {
   Loader2,
   AlertOctagon,
   GraduationCap,
+  CalendarOff,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Sessions", href: "/admin/sessions", icon: Calendar },
+  { label: "Holidays", href: "/admin/holidays", icon: CalendarOff },
   { label: "Subjects", href: "/admin/subjects", icon: BookOpen },
   { label: "Timetable", href: "/admin/timetable", icon: Clock },
   { label: "Students", href: "/admin/students", icon: Users },

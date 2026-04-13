@@ -17,7 +17,7 @@ import { getDeviceFingerprint } from "@/lib/fingerprint";
 
 const NotesEditor = dynamic(
   () => import("@/app/daily-attendance/components/NotesEditor"),
-  { ssr: false }
+  { ssr: false },
 );
 
 interface Profile {
@@ -32,9 +32,10 @@ interface Profile {
 interface Props {
   profile: Profile;
   initialDate: string;
+  isHoliday?: boolean;
 }
 
-export default function DailyAttendanceClient({ profile, initialDate }: Props) {
+export default function DailyAttendanceClient({ profile, initialDate, isHoliday }: Props) {
   const router = useRouter();
   const [date, setDate] = useState(initialDate);
   const [periods, setPeriods] = useState<ClassPeriod[]>([]);
@@ -116,7 +117,7 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
           profile.id,
           "present",
           userLocation,
-          deviceFingerprint
+          deviceFingerprint,
         );
 
         if (result.error) {
@@ -124,9 +125,7 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
           // Revert optimistic update
           setPeriods((prev) =>
             prev.map((p) =>
-              p.sessionId === sessionId
-                ? { ...p, attendanceStatus: null }
-                : p,
+              p.sessionId === sessionId ? { ...p, attendanceStatus: null } : p,
             ),
           );
         } else {
@@ -157,13 +156,25 @@ export default function DailyAttendanceClient({ profile, initialDate }: Props) {
           semesterEnd={semesterEnd}
         />
 
-        {/* Schedule */}
-        <ScheduleTimeline
-          periods={periods}
-          loading={loading}
-          date={date}
-          onStatusChange={handleMarkPresent}
-        />
+        {/* Holiday Banner / Schedule */}
+        {isHoliday ? (
+           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-2xl p-8 text-center shadow-sm">
+             <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🎉</span>
+             </div>
+             <h2 className="text-xl font-bold text-amber-800 dark:text-amber-500 mb-2">Global Academic Holiday</h2>
+             <p className="text-amber-700/80 dark:text-amber-600/80 text-sm max-w-md mx-auto">
+               This date is marked as an institute holiday. No classes are scheduled and attendance will not be counted.
+             </p>
+           </div>
+        ) : (
+           <ScheduleTimeline
+             periods={periods}
+             loading={loading}
+             date={date}
+             onStatusChange={handleMarkPresent}
+           />
+        )}
 
         {/* Daily Notes Editor */}
         <NotesEditor profile={profile} date={date} />

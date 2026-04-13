@@ -18,6 +18,8 @@ interface DayData {
   missed: number;
   cancelled: number;
   isCurrentWeek: boolean;
+  isHoliday: boolean;
+  holidayTitle?: string;
 }
 
 interface MonthCalendarProps {
@@ -102,6 +104,24 @@ export default function MonthCalendar({
         attendanceMap = {};
       }
 
+      // Fetch holidays
+      let holidayMap: Record<string, string> = {};
+      try {
+        const supabase = createClient();
+        const { data: hData } = await supabase
+          .from("academic_holidays" as any)
+          .select("date, title")
+          .eq("session_id", semesterId)   // Filtering by session if necessary
+          .gte("date", monthDates[0])
+          .lte("date", monthDates[monthDates.length - 1]);
+        
+        (hData as any[])?.forEach(h => {
+          holidayMap[h.date] = h.title;
+        });
+      } catch (e) {
+        console.error(e);
+      }
+
       const days: DayData[] = [];
 
       // Previous month padding
@@ -119,6 +139,7 @@ export default function MonthCalendar({
           missed: 0,
           cancelled: 0,
           isCurrentWeek: false,
+          isHoliday: false,
         });
       }
 
@@ -141,6 +162,8 @@ export default function MonthCalendar({
           missed: att?.missed ?? 0,
           cancelled: att?.cancelled ?? 0,
           isCurrentWeek: cur >= currentWeekStart && cur <= currentWeekEnd,
+          isHoliday: !!holidayMap[fullDate],
+          holidayTitle: holidayMap[fullDate],
         });
       }
 
@@ -158,6 +181,7 @@ export default function MonthCalendar({
           missed: 0,
           cancelled: 0,
           isCurrentWeek: false,
+          isHoliday: false,
         });
       }
 
@@ -192,7 +216,7 @@ export default function MonthCalendar({
         },
         () => {
           setRefetchTrigger((prev) => prev + 1);
-        }
+        },
       )
       .subscribe();
 
@@ -212,11 +236,16 @@ export default function MonthCalendar({
     return <div className={`w-2 h-2 rounded-full ${color}`} />;
   };
 
-  const isCurrentSessionMonth = 
+  const isCurrentSessionMonth =
     year === new Date().getFullYear() && month === new Date().getMonth();
 
   useEffect(() => {
-    if (!loading && isCurrentSessionMonth && containerRef.current && !hasScrolledRef.current) {
+    if (
+      !loading &&
+      isCurrentSessionMonth &&
+      containerRef.current &&
+      !hasScrolledRef.current
+    ) {
       hasScrolledRef.current = true;
       // Small timeout to allow the browser to paint the new DOM height
       setTimeout(() => {
@@ -284,7 +313,8 @@ export default function MonthCalendar({
           if (isSundayOrSaturday) {
             cls += " bg-red-50/60 dark:bg-red-950/20";
           } else {
-            cls += " bg-slate-50/60 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800";
+            cls +=
+              " bg-slate-50/60 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800";
           }
 
           if (day.isCurrentMonth) {
@@ -293,9 +323,21 @@ export default function MonthCalendar({
             cls += " opacity-40 cursor-default";
           }
 
+          // Foreground base
+          let textColor = "text-muted-foreground";
+          if (day.isCurrentMonth) {
+             if (day.isToday) textColor = "text-blue-500";
+             else if (day.isHoliday) textColor = "text-amber-600 dark:text-amber-500";
+             else if (isSundayOrSaturday) textColor = "text-red-500/80 dark:text-red-400/80";
+             else textColor = "text-foreground";
+          }
+
           // Figma layout for "Today" specifically requests a blue border, white bg, blue text
           if (day.isToday && day.isCurrentMonth) {
-             cls = "relative aspect-[4/3] rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer hover:shadow-sm hover:-translate-y-0.5 bg-background border border-blue-500 shadow-sm";
+            cls =
+              "relative aspect-[4/3] rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer hover:shadow-sm hover:-translate-y-0.5 bg-background border border-blue-500 shadow-sm";
+          } else if (day.isHoliday && day.isCurrentMonth) {
+             cls = "relative aspect-[4/3] rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 cursor-pointer hover:shadow-sm hover:-translate-y-0.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 shadow-sm";
           }
 
           return (
@@ -303,30 +345,28 @@ export default function MonthCalendar({
               key={index}
               onClick={() => {
                 if (!day.isCurrentMonth) return;
-                router.push(`/daily-attendance?date=${day.fullDate}`);
+                router.push(`/daily-attendance?date=${day.fullDate}&holiday=${day.isHoliday}`);
               }}
               disabled={!day.isCurrentMonth}
               className={cls}
+              title={day.holidayTitle}
               aria-label={`${MONTH_NAMES[month]} ${day.date}, ${year}`}
             >
               <span
-                className={`text-sm font-bold ${
-                  day.isToday && day.isCurrentMonth
-                    ? "text-blue-500"
-                    : isSundayOrSaturday && day.isCurrentMonth
-                      ? "text-red-500/80 dark:text-red-400/80"
-                      : day.isCurrentMonth
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                }`}
+                className={`text-sm font-bold ${textColor}`}
               >
                 {day.date}
               </span>
 
-              {day.isCurrentMonth && !day.isWeekend && day.isSemesterDay && (
+              {day.isCurrentMonth && !day.isWeekend && day.isSemesterDay && !day.isHoliday && (
                 <div className="absolute bottom-2 flex items-center justify-center w-full">
                   {getIndicator(day)}
                 </div>
+              )}
+              {day.isHoliday && day.isCurrentMonth && (
+                 <div className="absolute bottom-1 w-full text-center">
+                    <div className="w-[4px] h-[4px] rounded-full bg-amber-500 mx-auto" />
+                 </div>
               )}
             </button>
           );

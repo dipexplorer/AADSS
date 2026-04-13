@@ -9,7 +9,7 @@ import Header from "@/components/common/Header";
 export default async function DailyAttendancePage({
   searchParams,
 }: {
-  searchParams: { date?: string };
+  searchParams: { date?: string, holiday?: string };
 }) {
   const supabase = createClient();
   const {
@@ -30,7 +30,7 @@ export default async function DailyAttendancePage({
     <>
       <Header />
       <Suspense fallback={<DailyAttendanceSkeleton />}>
-        <DailyAttendanceClient profile={profile} initialDate={dateStr} />
+        <DailyAttendanceClient profile={profile} initialDate={dateStr} isHoliday={searchParams.holiday === 'true'} />
       </Suspense>
     </>
   );
