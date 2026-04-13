@@ -28,8 +28,10 @@ import {
   Info,
   Edit,
   Copy,
+  BookOpen, // Added for the new UI Button
   Check as CheckIcon,
 } from "lucide-react";
+import ClassRosterView from "./ClassRosterView";
 
 interface Props {
   sessions: any[];
@@ -80,6 +82,9 @@ export default function ClassSessionsClient({
     string | null
   >(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  
+  // Roster View Active Id
+  const [activeRosterId, setActiveRosterId] = useState<string | null>(null);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -409,23 +414,38 @@ export default function ClassSessionsClient({
                                 <StatusIcon className="w-3.5 h-3.5" />
                                 {statusConf.label}
                               </span>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(s.id);
-                                  setCopiedId(s.id);
-                                  setTimeout(() => setCopiedId(null), 2000);
-                                  toast.success("Session ID Copied!");
-                                }}
-                                className="ml-auto sm:ml-2 flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-secondary/50 hover:bg-secondary px-2 py-1 rounded-lg transition-colors border border-border/50"
-                                title="Copy Session ID"
-                              >
-                                {copiedId === s.id ? (
-                                  <CheckIcon className="w-3 h-3 text-green-500" />
-                                ) : (
-                                  <Copy className="w-3 h-3" />
-                                )}
-                                {copiedId === s.id ? "Copied ID" : "Copy ID"}
-                              </button>
+                              <div className="ml-auto sm:ml-2 flex items-center gap-2">
+                                <button
+                                  onClick={() => setActiveRosterId(activeRosterId === s.id ? null : s.id)}
+                                  className={`flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors border ${
+                                    activeRosterId === s.id 
+                                      ? "bg-primary text-primary-foreground border-primary" 
+                                      : "bg-secondary/50 text-foreground hover:bg-secondary border-border/50"
+                                  }`}
+                                  title="View and Edit Attendance"
+                                >
+                                  <BookOpen className="w-3.5 h-3.5" />
+                                  {activeRosterId === s.id ? "Close Roster" : "Edit Register"}
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(s.id);
+                                    setCopiedId(s.id);
+                                    setTimeout(() => setCopiedId(null), 2000);
+                                    toast.success("Session ID Copied!");
+                                  }}
+                                  className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground bg-secondary/50 hover:bg-secondary px-2 py-1.5 rounded-lg transition-colors border border-border/50"
+                                  title="Copy Session ID"
+                                >
+                                  {copiedId === s.id ? (
+                                    <CheckIcon className="w-3 h-3 text-green-500" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                  {copiedId === s.id ? "Copied" : "Copy ID"}
+                                </button>
+                              </div>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground mt-1 text-medium">
@@ -673,6 +693,12 @@ export default function ClassSessionsClient({
                             </div>
                           </div>
                         )}
+                        
+                        {/* Dynamic Roster Editor */}
+                        {activeRosterId === s.id && (
+                          <ClassRosterView classSessionId={s.id} />
+                        )}
+
                       </div>
                     </div>
                   </div>

@@ -392,3 +392,60 @@ export async function overrideStudentAttendance(
   revalidatePath("/admin/classes");
   return { success: true };
 }
+
+/**
+ * Retrieves all students enrolled in the class's semester,
+ * along with their specific attendance record for this exact class session.
+ */
+export async function getClassSessionRoster(classSessionId: string) {
+  const supabase = await requireAdmin();
+
+  const { data: session, error: sessErr } = await supabase
+    .from("class_sessions")
+    .select("subjects(semester_id)")
+    .eq("id", classSessionId)
+    .single();
+
+  if (sessErr || !session) return { error: "Session not found" };
+
+  const semesterId = (session.subjects as any).semester_id;
+  if (!semesterId) return { error: "Could not map class to a semester" };
+
+  const { data: students, error: studErr } = await supabase
+    .from("student_profiles")
+    .select(`
+      id,
+      full_name,
+      roll_number,
+      attendance (
+        status,
+        marked_at,
+        overridden_by
+      )
+    `)
+    .eq("semester_id", semesterId)
+    .eq("attendance.class_session_id", classSessionId);
+
+  if (studErr) {
+    return { error: studErr.message };
+  }
+
+  // Format array to a clean state
+  const roster = students.map((s: any) => ({
+    id: s.id,
+    full_name: s.full_name,
+    roll_number: s.roll_number,
+    // Safely extract attendance for this class or default to 'absent/pending' visually
+    attendance: s.attendance && s.attendance.length > 0 ? s.attendance[0] : null,
+  }));
+
+  // Sort by roll number naturally or alphabetically by name
+  roster.sort((a, b) => {
+    if (a.roll_number && b.roll_number) return a.roll_number.localeCompare(b.roll_number);
+    if (a.full_name && b.full_name) return a.full_name.localeCompare(b.full_name);
+    return 0;
+  });
+
+  return { success: true, data: roster };
+}
+
