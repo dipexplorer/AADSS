@@ -10,7 +10,10 @@ export default async function AdminClassesPage({
 }) {
   const supabase = createClient();
   const params = await searchParams;
-  const today = new Date().toISOString().split("T")[0];
+  
+  // Use toLocaleDateString with 'en-CA' (Canada locale natively outputs YYYY-MM-DD)
+  // This correctly evaluates the local system timezone instead of forcing UTC like toISOString() 
+  const today = new Date().toLocaleDateString("en-CA");
   const targetDate = params.date ?? today;
 
   // Force generate sessions for current/future dates so admin can manage them

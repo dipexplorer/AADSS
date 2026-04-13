@@ -416,6 +416,19 @@ export async function getClassSessionRoster(classSessionId: string) {
    * 1. Ya toh is semester mein CURRENTLY hain (New students / current sem)
    * 2. Ya jinka is class session mein pehle se attendance record hai (Historical data)
    */
+   
+  // Pre-fetch any historical students who have attendance marked for this session
+  const { data: histAtt } = await supabase
+    .from("attendance")
+    .select("student_id")
+    .eq("class_session_id", classSessionId);
+  const histIds = (histAtt || []).map(a => a.student_id);
+
+  let orQuery = `semester_id.eq.${semesterId}`;
+  if (histIds.length > 0) {
+    orQuery += `,id.in.(${histIds.join(",")})`;
+  }
+
   const { data: students, error: studErr } = await supabase
     .from("student_profiles")
     .select(`
@@ -432,7 +445,7 @@ export async function getClassSessionRoster(classSessionId: string) {
     // Filter attendance to ONLY this specific session
     .eq("attendance.class_session_id", classSessionId)
     // Filter profiles: Current Sem OR Already marked in this class
-    .or(`semester_id.eq.${semesterId},id.in.(SELECT student_id FROM attendance WHERE class_session_id='${classSessionId}')`);
+    .or(orQuery);
 
   if (studErr) {
     return { error: studErr.message };

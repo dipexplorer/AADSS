@@ -85,15 +85,18 @@ export async function getDefaultersReport(semesterId: string): Promise<{
   if (subErr) return { data: null, error: subErr.message };
   if (!subjectsRaw || subjectsRaw.length === 0) return { data: [], error: "No subjects found for this semester." };
 
-  // Fetch Class Sessions for these subjects to know the TOTAL possible classes
+  // Fetch Class Sessions for these subjects to know the TOTAL possible classes (up to today)
+  const todayStr = new Date().toISOString().split('T')[0];
   const { data: sessionsRaw, error: sessErr } = await supabase
     .from("class_sessions")
     .select(`
       id,
+      date,
       subject_id,
       subjects!inner(semester_id)
     `)
     .eq("subjects.semester_id", semesterId)
+    .lte("date", todayStr)
     .neq("status", "cancelled");
 
   if (sessErr) return { data: null, error: sessErr.message };
