@@ -86,7 +86,7 @@ export async function getDefaultersReport(semesterId: string): Promise<{
   if (!subjectsRaw || subjectsRaw.length === 0) return { data: [], error: "No subjects found for this semester." };
 
   // Fetch Class Sessions for these subjects to know the TOTAL possible classes (up to today)
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toLocaleDateString("en-CA");
   const { data: sessionsRaw, error: sessErr } = await supabase
     .from("class_sessions")
     .select(`

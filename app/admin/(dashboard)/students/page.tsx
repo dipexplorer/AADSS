@@ -56,7 +56,7 @@ export default async function AdminStudentsPage() {
     // Step 1: Fetch all class sessions for the relevant semesters to get the TRUE total count
     // IMPORTANT: Include ONLY sessions up to TODAY that are not cancelled.
     const uniqueSemesterIds = Array.from(new Set(studentList.map(s => s.semester_id)));
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString("en-CA");
     
     const { data: sessionData } = await supabase
       .from("class_sessions")
