@@ -42,6 +42,11 @@ export default function DailyAttendanceClient({ profile, initialDate, isHoliday 
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
+  // Sync state with URL params during client-side navigation
+  useEffect(() => {
+    setDate(initialDate);
+  }, [initialDate]);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
