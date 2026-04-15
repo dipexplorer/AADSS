@@ -1,3 +1,4 @@
+// app/semester-statistics/components/StatisticsHeader.tsx
 "use client";
 
 import type { OverallAnalytics } from "@/lib/engines/analytics/types";
@@ -9,43 +10,29 @@ interface Props {
   sessionName: string;
 }
 
-export default function StatisticsHeader({
-  overall,
-  programName,
-  semesterNumber,
-  sessionName,
-}: Props) {
-  const statusColor =
-    overall.overallPercentage >= 75
-      ? "text-green-600"
-      : overall.overallPercentage >= 70
-        ? "text-yellow-600"
-        : "text-red-600";
+export default function StatisticsHeader({ overall, programName, semesterNumber, sessionName }: Props) {
+  const hasCritical = overall.dangerSubjectsCount > 0;
+  const hasAtRisk   = overall.warningSubjectsCount > 0;
+  const allSafe     = !hasCritical && !hasAtRisk;
 
-  const barColor =
-    overall.overallPercentage >= 75
-      ? "bg-green-500"
-      : overall.overallPercentage >= 70
-        ? "bg-yellow-500"
-        : "bg-red-500";
+  // Status label — plain and clear, no "Eligible/Not Eligible" confusion
+  const statusLabel = hasCritical ? "Critical Subjects Present" : hasAtRisk ? "Needs Attention" : "All Subjects Safe";
 
-  const statusLabel =
-    overall.overallPercentage >= 75
-      ? "Safe Zone"
-      : overall.overallPercentage >= 70
-        ? "Caution Zone"
-        : "Danger Zone";
+  const statusColors = hasCritical
+    ? { text: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800", dot: "bg-red-500" }
+    : hasAtRisk
+      ? { text: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800", dot: "bg-yellow-500" }
+      : { text: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800", dot: "bg-green-500" };
 
   return (
-    <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        {/* Left — Title */}
+    <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 space-y-4">
+
+      {/* Title + status badge */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">
-            Semester Statistics
-          </h1>
+          <h1 className="text-xl font-bold text-foreground">Attendance Overview</h1>
           {(programName || semesterNumber || sessionName) && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {programName}
               {semesterNumber ? ` · Semester ${semesterNumber}` : ""}
               {sessionName ? ` · ${sessionName}` : ""}
@@ -53,75 +40,33 @@ export default function StatisticsHeader({
           )}
         </div>
 
-        {/* Right — Overall % */}
         <div
-          className={`flex items-center gap-4 px-6 py-4 rounded-xl bg-muted/30 border border-border/50`}
+          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold shrink-0 ${statusColors.bg} ${statusColors.text}`}
         >
-          <div className="text-center">
-            <div className={`text-4xl font-bold tracking-tight ${statusColor}`}>
-              {overall.overallPercentage}%
-            </div>
-            <div className={`text-sm font-semibold mt-0.5 ${statusColor}`}>
-              {statusLabel}
-            </div>
-          </div>
-
-          <div className="w-px h-12 bg-border/50" />
-
-          <div className="text-sm text-muted-foreground space-y-1">
-            <div>
-              <span className="font-semibold text-foreground">
-                {overall.presentClasses}
-              </span>{" "}
-              attended
-            </div>
-            <div>
-              <span className="font-semibold text-foreground">
-                {overall.totalClasses}
-              </span>{" "}
-              total classes
-            </div>
-          </div>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${statusColors.dot}`} aria-hidden="true" />
+          {statusLabel}
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="mt-6">
-        <div className="w-full bg-muted/30 rounded-full h-3 overflow-hidden">
-          <div
-            className={`h-full transition-all duration-1000 rounded-full ${barColor}`}
-            style={{ width: `${overall.overallPercentage}%` }}
-          />
-        </div>
+      {/* Risk counts — the 3 cells are the main data point */}
+      <div className="grid grid-cols-3 gap-3">
+        <RiskCell count={overall.safeSubjectsCount}    label="Safe (≥75%)"  color="text-green-600 dark:text-green-400"   bg="bg-green-50 dark:bg-green-950/20" />
+        <RiskCell count={overall.warningSubjectsCount} label="At Risk"      color="text-yellow-600 dark:text-yellow-400" bg="bg-yellow-50 dark:bg-yellow-950/20" />
+        <RiskCell count={overall.dangerSubjectsCount}  label="Critical"     color="text-red-600 dark:text-red-400"       bg="bg-red-50 dark:bg-red-950/20" />
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4 mt-4">
-        {[
-          {
-            label: "Safe",
-            count: overall.safeSubjectsCount,
-            color: "text-green-600 bg-green-50 dark:bg-green-950/20",
-          },
-          {
-            label: "Warning",
-            count: overall.warningSubjectsCount,
-            color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20",
-          },
-          {
-            label: "Danger",
-            count: overall.dangerSubjectsCount,
-            color: "text-red-600 bg-red-50 dark:bg-red-950/20",
-          },
-        ].map(({ label, count, color }) => (
-          <div key={label} className={`rounded-xl p-3 text-center ${color}`}>
-            <div className="text-2xl font-bold">{count}</div>
-            <div className="text-xs font-semibold uppercase tracking-wider mt-0.5 opacity-80">
-              {label}
-            </div>
-          </div>
-        ))}
-      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Exam eligibility requires <strong>all subjects</strong> to have ≥75% attendance. Cancelled classes are excluded from calculations.
+      </p>
+    </div>
+  );
+}
+
+function RiskCell({ count, label, color, bg }: { count: number; label: string; color: string; bg: string }) {
+  return (
+    <div className={`rounded-xl p-3 text-center ${bg}`}>
+      <div className={`text-2xl font-black ${color}`}>{count}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">{label}</div>
     </div>
   );
 }

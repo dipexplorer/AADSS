@@ -66,7 +66,7 @@ export async function getAnalyticsSummary(
   ] = await Promise.all([
     supabase
       .from("academic_sessions")
-      .select("end_date")
+      .select("start_date, end_date")
       .eq("id", sessionId)
       .single(),
     supabase
@@ -77,10 +77,15 @@ export async function getAnalyticsSummary(
       .from("class_sessions")
       .select("id, subject_id, status, date")
       .in("subject_id", subjectIds)
-      .neq("status", "scheduled"),
+      .lte("date", new Date().toLocaleDateString("en-CA")), // all past sessions up to today
+    // Note: we filter by session start_date after fetching sessionData below
   ]);
 
   if (sessionsError) return { data: null, error: sessionsError.message };
+
+  // Filter class sessions to only those within the active academic session's date range
+  const sessionStart = sessionData?.start_date ?? "1970-01-01";
+  const filteredSessions = (sessions ?? []).filter((s) => s.date >= sessionStart);
 
   // 3. Remaining classes per subject calculate karo
   const today = new Date();
@@ -110,7 +115,7 @@ export async function getAnalyticsSummary(
   });
 
   // 4. Attendance fetch
-  const sessionIds = (sessions ?? []).map((s) => s.id);
+  const sessionIds = filteredSessions.map((s) => s.id);
   let attendanceRecords: { class_session_id: string; status: string }[] = [];
 
   if (sessionIds.length > 0) {
@@ -126,7 +131,7 @@ export async function getAnalyticsSummary(
 
   // 5. Per-subject analytics
   const subjectAnalytics: SubjectAnalytics[] = subjects.map((subject) => {
-    const subjectSessions = (sessions ?? []).filter(
+    const subjectSessions = filteredSessions.filter(
       (s) => s.subject_id === subject.id,
     );
     const nonCancelledSessions = subjectSessions.filter(
