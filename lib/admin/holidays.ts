@@ -63,6 +63,33 @@ export async function addHoliday(prevState: any, formData: FormData) {
 export async function deleteHoliday(holidayId: string) {
   const supabase = await createClient();
   
+  // STEP 1: Get the holiday detail before deleting it so we know the EXACT date
+  const { data: holidayData, error: fetchError } = await supabase
+    .from("academic_holidays" as any)
+    .select("date")
+    .eq("id", holidayId)
+    .single();
+
+  if (fetchError || !holidayData) {
+    return { error: fetchError?.message || "Holiday not found" };
+  }
+
+  const targetDate = (holidayData as any).date;
+
+  // STEP 2: Rollback the class sessions on this date back to "scheduled"
+  // Safe condition: only rollback those that are currently "cancelled"
+  const { error: cascadeError } = await supabase
+    .from("class_sessions")
+    .update({ status: "scheduled" })
+    .eq("date", targetDate)
+    .eq("status", "cancelled");
+
+  if (cascadeError) {
+    console.error("Rollback failed:", cascadeError);
+    // Don't stop here, we should still try to delete the holiday
+  }
+
+  // STEP 3: Now permanently delete the holiday record
   const { error } = await supabase
     .from("academic_holidays" as any)
     .delete()
