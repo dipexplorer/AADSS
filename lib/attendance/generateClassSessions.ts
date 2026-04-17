@@ -24,18 +24,6 @@ export async function generateClassSessionsForDate(
 
   const subjectIds = semesterSubjects.map((s) => s.id);
 
-  // Is date + semester ke sessions already exist karte hain?
-  const { data: existing } = await supabase
-    .from("class_sessions")
-    .select("id")
-    .eq("date", date)
-    .in("subject_id", subjectIds)
-    .limit(1);
-
-  if (existing && existing.length > 0) {
-    return { generated: 0, error: null }; // Already generated for this semester
-  }
-
   // Is semester ke subjects ke liye timetable fetch karo
   const { data: timetableSlots, error: ttError } = await supabase
     .from("timetable")
@@ -59,8 +47,26 @@ export async function generateClassSessionsForDate(
     return { generated: 0, error: null }; // No classes this day
   }
 
+  // Is date ke already generated sessions laiye taaki duplicates na ho
+  const { data: existingSessions } = await supabase
+    .from("class_sessions")
+    .select("timetable_id")
+    .eq("date", date)
+    .not("timetable_id", "is", null);
+
+  const existingTimetableIds = new Set((existingSessions || []).map(s => s.timetable_id));
+
+  // Sirf un timetable slots ko insert karo jo abhi tak generate nahi hue
+  const slotsToGenerate = timetableSlots.filter(
+    slot => !existingTimetableIds.has(slot.id)
+  );
+
+  if (slotsToGenerate.length === 0) {
+    return { generated: 0, error: null }; // Sab kuch already generated hai
+  }
+
   // Class sessions insert karo
-  const sessionsToInsert = timetableSlots.map((slot) => ({
+  const sessionsToInsert = slotsToGenerate.map((slot) => ({
     timetable_id: slot.id,
     subject_id: slot.subject_id,
     date,

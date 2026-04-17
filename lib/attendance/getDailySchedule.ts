@@ -40,17 +40,21 @@ export async function getDailySchedule(
   await autoMarkAbsentForCompletedSessions(semesterId);
 
   // Is date ke class sessions fetch karo with subject info
-  // !inner join se sirf is semester ke subjects filter ho jaayenge
+  // !inner join subjects se sirf is semester ke subjects filter ho jaayenge
+  // Note: timetable is a LEFT join — !inner was dropping valid sessions
+  // Safety is guaranteed by .not(timetable_id, is, null) + cascade delete on slot removal
   const { data: sessions, error: sessionsError } = await supabase
     .from("class_sessions")
     .select(
       `
       id,
       subject_id,
+      timetable_id,
       start_time,
       end_time,
       status,
       timetable (
+        id,
         room
       ),
       subjects!inner (
@@ -61,6 +65,7 @@ export async function getDailySchedule(
     )
     .eq("date", date)
     .eq("subjects.semester_id", semesterId)
+    .not("timetable_id", "is", null)
     .order("start_time", { ascending: true });
 
   if (sessionsError) return { data: null, error: sessionsError.message };

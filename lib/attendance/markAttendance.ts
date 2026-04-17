@@ -40,7 +40,14 @@ export async function markAttendance(
   }
 
   // ── Guard: Device Fingerprint Verification ────────────────────────
-  if (user.user_metadata?.device_id && user.user_metadata.device_id !== deviceFingerprint) {
+  // DEVICE_LOCK is only enforced when explicitly enabled via env variable.
+  // During dev/testing, fingerprints may collide (same browser, multiple accounts).
+  const deviceLockEnabled = process.env.NEXT_PUBLIC_DEVICE_LOCK_ENABLED === "true";
+  if (
+    deviceLockEnabled &&
+    user.user_metadata?.device_id &&
+    user.user_metadata.device_id !== deviceFingerprint
+  ) {
     return {
       error: "Proxy Detected: You must use your registered primary attendance device.",
       validationError: "PROXY_DETECTED",

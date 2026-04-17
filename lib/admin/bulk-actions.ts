@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 
 export async function processBulkStudentImport(
   targetSessionId: string,
-  rows: { email: string; roll: string; program: string; semester: string }[]
+  rows: { email: string; roll: string; program: string; semester: string }[],
 ) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) {
-    return { error: "Missing SUPABASE_SERVICE_ROLE_KEY. Bulk account provisioning requires administrative service-role permissions." };
+    return {
+      error:
+        "Missing SUPABASE_SERVICE_ROLE_KEY. Bulk account provisioning requires administrative service-role permissions.",
+    };
   }
 
   const supabaseAdmin = createClient(
@@ -17,9 +20,9 @@ export async function processBulkStudentImport(
     {
       auth: {
         autoRefreshToken: false,
-        persistSession: false
-      }
-    }
+        persistSession: false,
+      },
+    },
   );
 
   let successCount = 0;
@@ -30,7 +33,7 @@ export async function processBulkStudentImport(
     .from("programs")
     .select("id, name")
     .eq("session_id", targetSessionId);
-    
+
   const { data: semesters } = await supabaseAdmin
     .from("semesters")
     .select("id, semester_number, program_id");
@@ -42,7 +45,9 @@ export async function processBulkStudentImport(
   for (const row of rows) {
     try {
       // Find Program ID mapped by text
-      const prog = programs.find(p => p.name.toLowerCase() === row.program.toLowerCase());
+      const prog = programs.find(
+        (p) => p.name.toLowerCase() === row.program.toLowerCase(),
+      );
       if (!prog) {
         errors.push(`Row ${row.email}: Program '${row.program}' not found.`);
         continue;
@@ -50,25 +55,30 @@ export async function processBulkStudentImport(
 
       // Find Semester ID
       const semNumber = parseInt(row.semester);
-      const sem = semesters.find(s => s.program_id === prog.id && s.semester_number === semNumber);
+      const sem = semesters.find(
+        (s) => s.program_id === prog.id && s.semester_number === semNumber,
+      );
       if (!sem) {
-         errors.push(`Row ${row.email}: Semester ${semNumber} not found for ${prog.name}.`);
-         continue;
+        errors.push(
+          `Row ${row.email}: Semester ${semNumber} not found for ${prog.name}.`,
+        );
+        continue;
       }
 
       // 2. Provision Supabase Auth User seamlessly
       // We generate a deterministic or secure default password so Auth doesn't fail.
       const securePassword = `${row.roll.toUpperCase()}@Acadence2026`;
-      
-      const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
-        email: row.email,
-        email_confirm: true, // Auto-confirm for enterprise import
-        password: securePassword,
-        user_metadata: {
-          roll_number: row.roll,
-          role: "student"
-        }
-      });
+
+      const { data: authData, error: authErr } =
+        await supabaseAdmin.auth.admin.createUser({
+          email: row.email,
+          email_confirm: true, // Auto-confirm for enterprise import
+          password: securePassword,
+          user_metadata: {
+            roll_number: row.roll,
+            role: "student",
+          },
+        });
 
       if (authErr) {
         // If user already exists, it might throw an error. We log and skip.
@@ -79,16 +89,20 @@ export async function processBulkStudentImport(
       const userId = authData.user.id;
 
       // 3. Map into Student Profiles rel-database
-      const { error: profileErr } = await supabaseAdmin.from("student_profiles").insert({
-        user_id: userId,
-        session_id: targetSessionId,
-        program_id: prog.id,
-        semester_id: sem.id
-      });
+      const { error: profileErr } = await supabaseAdmin
+        .from("student_profiles")
+        .insert({
+          user_id: userId,
+          session_id: targetSessionId,
+          program_id: prog.id,
+          semester_id: sem.id,
+        });
 
       if (profileErr) {
         // Rollback strategy could go here
-        errors.push(`Row ${row.email}: DB Profile failed - ${profileErr.message}`);
+        errors.push(
+          `Row ${row.email}: DB Profile failed - ${profileErr.message}`,
+        );
         continue;
       }
 
@@ -99,11 +113,11 @@ export async function processBulkStudentImport(
   }
 
   revalidatePath("/admin/students");
-  
-  return { 
-    success: true, 
-    count: successCount, 
+
+  return {
+    success: true,
+    count: successCount,
     total: rows.length,
-    log: errors.length > 0 ? errors : null 
+    log: errors.length > 0 ? errors : null,
   };
 }
