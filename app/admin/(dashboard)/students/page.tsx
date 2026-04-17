@@ -12,7 +12,7 @@ export default async function AdminStudentsPage() {
       user_id,
       semester_id,
       created_at,
-      academic_sessions(name),
+      academic_sessions(name, start_date),
       programs(name),
       semesters(semester_number)
     `)
@@ -69,21 +69,22 @@ export default async function AdminStudentsPage() {
       .lte("date", todayStr)
       .neq("status", "cancelled");
 
-    const semesterSessionCounts: Record<string, number> = {};
-    uniqueSemesterIds.forEach(id => semesterSessionCounts[id] = 0);
-    
-    (sessionData ?? []).forEach((sess: any) => {
-      const semId = sess.subjects?.semester_id;
-      if (semId) {
-        semesterSessionCounts[semId]++;
-      }
-    });
+    // We can't just group eagerly because some old 2025 classes belong
+    // to the semester_id but NOT to the current student's active session!
+    const classSessions = sessionData ?? [];
 
-    // Initialize student counts with their semester's TRUE total
+    // Initialize student counts by precisely matching class_session date with student's session bound
     studentList.forEach(s => {
+      const sessionStart = s.academic_sessions?.start_date ?? "1970-01-01";
+      
+      const validClasses = classSessions.filter((c: any) => 
+        c.subjects.semester_id === s.semester_id && 
+        c.date >= sessionStart
+      );
+
       attendanceCounts[s.id] = {
         present: 0,
-        total: semesterSessionCounts[s.semester_id] || 0
+        total: validClasses.length
       };
     });
 
@@ -94,6 +95,7 @@ export default async function AdminStudentsPage() {
         student_id,
         status,
         class_sessions!inner (
+          date,
           subject_id,
           subjects!inner (
             semester_id
@@ -104,16 +106,21 @@ export default async function AdminStudentsPage() {
       .neq("status", "cancelled");
 
     const studentSemMap: Record<string, string> = {};
+    const studentSessionStartMap: Record<string, string> = {};
     studentList.forEach((s) => {
       studentSemMap[s.id] = s.semester_id;
+      studentSessionStartMap[s.id] = (s.academic_sessions as any)?.start_date ?? "1970-01-01";
     });
 
     // Step 3: Count only "present" rows where the class belongs to their current semester
     (attendanceData ?? []).forEach((a: any) => {
+      const classDate = a.class_sessions?.date;
       const classSemesterId = a.class_sessions?.subjects?.semester_id;
       const studentCurrentSemId = studentSemMap[a.student_id];
+      const studentSessionStart = studentSessionStartMap[a.student_id];
 
       if (!classSemesterId || classSemesterId !== studentCurrentSemId) return;
+      if (!classDate || classDate < studentSessionStart) return;
 
       if (a.status === "present") {
         attendanceCounts[a.student_id].present++;
