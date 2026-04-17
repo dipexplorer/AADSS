@@ -34,6 +34,7 @@ export async function generateClassSessionsForDate(
       start_time,
       end_time,
       room,
+      created_at,
       subjects!inner (
         semester_id
       )
@@ -57,9 +58,19 @@ export async function generateClassSessionsForDate(
   const existingTimetableIds = new Set((existingSessions || []).map(s => s.timetable_id));
 
   // Sirf un timetable slots ko insert karo jo abhi tak generate nahi hue
-  const slotsToGenerate = timetableSlots.filter(
-    slot => !existingTimetableIds.has(slot.id)
-  );
+  // AND ensure we don't back-fill classes into the past before the slot was created!
+  const slotsToGenerate = timetableSlots.filter((slot) => {
+    if (existingTimetableIds.has(slot.id)) return false;
+    
+    // Check back-fill protection! Do not generate a session for '2026-03-10' if
+    // the admin only created this timetable slot on '2026-04-17'.
+    const slotCreatedDate = new Date(slot.created_at as string).toLocaleDateString("en-CA");
+    if (date < slotCreatedDate) {
+      return false; // Skip back-filling ancient dates for newly created slots
+    }
+    
+    return true;
+  });
 
   if (slotsToGenerate.length === 0) {
     return { generated: 0, error: null }; // Sab kuch already generated hai

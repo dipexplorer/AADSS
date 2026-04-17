@@ -104,16 +104,18 @@ export default function TimetableClient({ slots, subjects }: Props) {
 
     const topOffset =
       ((startHour - gridSettings.startHour) * 60 + startMin) * (60 / 60); // 60px per hour
-    const height =
-      ((endHour - startHour) * 60 + (endMin - startMin)) * (60 / 60);
-
+    
+    // Exact height based on time duration
+    const exactHeight = ((endHour - startHour) * 60 + (endMin - startMin)) * (60 / 60);
+    
     // Day index in WORK_DAYS (0 to 5)
     const dayIndex = WORK_DAYS.indexOf(slot.day_of_week);
     if (dayIndex === -1) return { display: "none" };
 
     return {
       top: `${topOffset}px`,
-      height: `${height}px`,
+      height: `${exactHeight}px`,
+      minHeight: `48px`, // Ensure short slots (e.g. 40mins) don't get visually squished
       left: `calc(${dayIndex} * (100% / 6))`,
       width: `calc(100% / 6 - 8px)`, // 8px for gap/padding
       marginLeft: "4px",
@@ -414,49 +416,50 @@ export default function TimetableClient({ slots, subjects }: Props) {
           </div>
 
           {/* Grid Scrollable Area */}
-          <div className="flex-1 overflow-y-auto relative">
-            {/* Background Grid Lines */}
-            <div className="absolute inset-0 z-0">
-              {HOURS.map((hour) => {
-                const isBreak = hour === gridSettings.breakStart;
-                return (
-                  <div
-                    key={hour}
-                    className={`flex h-[60px] border-b border-border/40 ${isBreak ? "bg-stripes-diagonal opacity-50 bg-muted/40" : ""}`}
-                  >
+          <div className="flex-1 overflow-y-auto">
+            <div className="relative w-full pb-8">
+              {/* Background Grid Lines */}
+              <div className="z-0 w-full">
+                {HOURS.map((hour) => {
+                  const isBreak = hour === gridSettings.breakStart;
+                  return (
                     <div
-                      className={`w-16 shrink-0 border-r border-border/60 flex items-start justify-center pt-2 text-[11px] font-medium ${isBreak ? "text-destructive" : "text-muted-foreground"} bg-card`}
+                      key={hour}
+                      className={`flex h-[60px] border-b border-border/40 ${isBreak ? "bg-stripes-diagonal opacity-50 bg-muted/40" : ""}`}
                     >
-                      {isBreak && (
-                        <span className="mr-1 mt-[2px] w-2 h-2 rounded-full bg-destructive/50" />
-                      )}
-                      {hour === 12
-                        ? "12 PM"
-                        : hour > 12
-                          ? `${hour - 12} PM`
-                          : `${hour} AM`}
-                    </div>
-                    {WORK_DAYS.map((d) => (
                       <div
-                        key={d}
-                        className={`flex-1 border-r border-border/40 last:border-r-0 border-dashed transition-colors ${!isBreak && "hover:bg-muted/10"}`}
+                        className={`w-16 shrink-0 border-r border-border/60 flex items-start justify-center pt-2 text-[11px] font-medium ${isBreak ? "text-destructive" : "text-muted-foreground"} bg-card`}
                       >
-                        {isBreak &&
-                          d === 3 && ( // Only render text in middle column
-                            <div className="w-full text-center mt-4 text-xs tracking-widest text-muted-foreground uppercase opacity-50 font-bold mix-blend-multiply">
-                              Break Period
-                            </div>
-                          )}
+                        {isBreak && (
+                          <span className="mr-1 mt-[2px] w-2 h-2 rounded-full bg-destructive/50" />
+                        )}
+                        {hour === 12
+                          ? "12 PM"
+                          : hour > 12
+                            ? `${hour - 12} PM`
+                            : `${hour} AM`}
                       </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+                      {WORK_DAYS.map((d) => (
+                        <div
+                          key={d}
+                          className={`flex-1 border-r border-border/40 last:border-r-0 border-dashed transition-colors ${!isBreak && "hover:bg-muted/10"}`}
+                        >
+                          {isBreak &&
+                            d === 3 && ( // Only render text in middle column
+                              <div className="w-full text-center mt-4 text-xs tracking-widest text-muted-foreground uppercase opacity-50 font-bold mix-blend-multiply">
+                                Break Period
+                              </div>
+                            )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
 
-            {/* Absolute Positioned Slots Container */}
-            <div className="absolute top-0 bottom-0 right-0 left-16 z-10 pointer-events-none">
-              {slots.map((slot) => {
+              {/* Absolute Positioned Slots Container */}
+              <div className="absolute top-0 bottom-0 right-0 left-16 z-10 pointer-events-none">
+                {slots.map((slot) => {
                 const style = getSlotStyle(slot);
                 if (style.display === "none") return null;
 
@@ -465,7 +468,7 @@ export default function TimetableClient({ slots, subjects }: Props) {
                     key={slot.id}
                     style={style}
                     onClick={() => setSelectedSlot(slot)}
-                    className="absolute bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-md p-2 shadow-sm pointer-events-auto overflow-hidden group hover:z-20 hover:shadow-md transition-shadow cursor-pointer flex flex-col"
+                    className="absolute bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-md px-2 py-1.5 shadow-sm pointer-events-auto overflow-hidden group hover:z-20 hover:shadow-md transition-shadow cursor-pointer flex flex-col"
                   >
                     <div className="flex justify-between items-start">
                       <span className="font-bold text-xs text-blue-900 dark:text-blue-100 truncate pr-2">
@@ -500,6 +503,7 @@ export default function TimetableClient({ slots, subjects }: Props) {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
         </div>

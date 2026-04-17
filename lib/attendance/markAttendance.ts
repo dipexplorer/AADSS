@@ -139,18 +139,20 @@ export async function markAttendance(
   }
 
   // ── 5. Geo-fence validation (only if classroom has coordinates) ────
-  const timetable = session.timetable as unknown as {
-    latitude?: number;
-    longitude?: number;
-    allowed_radius?: number;
-    room?: string;
-  } | null;
+  // CRITICAL: Supabase PostgREST returns joined relations as ARRAYS even for FK one-to-one.
+  // Old `as unknown as { latitude }` cast made latitude = undefined silently.
+  // The Array itself was truthy → geo-fence called with NaN → always rejected student.
+  const rawTimetable = session.timetable as unknown;
+  const timetableRow = Array.isArray(rawTimetable)
+    ? (rawTimetable[0] as Record<string, unknown> | undefined)
+    : (rawTimetable as Record<string, unknown> | null);
 
-  if (
-    timetable?.latitude &&
-    timetable?.longitude &&
-    timetable?.allowed_radius
-  ) {
+  const classLat = timetableRow?.latitude != null ? Number(timetableRow.latitude) : null;
+  const classLon = timetableRow?.longitude != null ? Number(timetableRow.longitude) : null;
+  const classRadius = timetableRow?.allowed_radius != null ? Number(timetableRow.allowed_radius) : null;
+
+  if (classLat !== null && classLon !== null && classRadius !== null &&
+      !isNaN(classLat) && !isNaN(classLon) && !isNaN(classRadius)) {
     if (!location) {
       return {
         error: "Location required to mark attendance for this class.",
@@ -160,9 +162,9 @@ export async function markAttendance(
 
     const geoCheck = validateGeofence(
       location,
-      timetable.latitude,
-      timetable.longitude,
-      timetable.allowed_radius,
+      classLat,
+      classLon,
+      classRadius,
     );
 
     if (!geoCheck.valid) {

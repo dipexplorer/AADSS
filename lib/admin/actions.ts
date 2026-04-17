@@ -214,8 +214,9 @@ export async function deleteTimetableSlot(id: string) {
   const supabase = await requireAdmin();
   const today = new Date().toLocaleDateString("en-CA");
 
-  // STEP 1: Cascade delete all FUTURE scheduled class_sessions tied to this timetable slot.
-  // Only delete "scheduled" sessions from today onwards — never touch past/completed/cancelled.
+  // Cascade delete all future SCHEDULED class_sessions for this timetable slot.
+  // If class never happens (slot removed), attendance should not exist either.
+  // Past/completed sessions are preserved as historical record.
   const { error: cascadeError } = await supabase
     .from("class_sessions")
     .delete()
@@ -224,11 +225,10 @@ export async function deleteTimetableSlot(id: string) {
     .gte("date", today);
 
   if (cascadeError) {
-    console.error("Cascade delete of class_sessions failed:", cascadeError.message);
     return { error: `Cascade failed: ${cascadeError.message}` };
   }
 
-  // STEP 2: Now delete the timetable slot itself
+  // Delete the timetable slot itself
   const { error } = await supabase.from("timetable").delete().eq("id", id);
   if (error) return { error: error.message };
 
