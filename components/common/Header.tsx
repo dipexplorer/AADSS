@@ -240,7 +240,7 @@ export default function Header() {
               {settingsOpen && (
                 <div className="absolute right-0 top-full mt-2 w-52 bg-popover border border-border rounded-xl shadow-lg overflow-hidden z-50">
                   <Link
-                    href="/semester-configuration"
+                    href="/timetable"
                     onClick={() => setSettingsOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors border-b border-border/50"
                   >
@@ -358,7 +358,7 @@ export default function Header() {
         {settingsOpen && (
           <div className="absolute bottom-16 right-4 w-52 bg-popover border border-border rounded-xl shadow-lg overflow-hidden z-50">
             <Link
-              href="/semester-configuration"
+              href="/timetable"
               onClick={() => setSettingsOpen(false)}
               className="flex items-center gap-3 px-4 py-3 text-sm text-foreground hover:bg-muted transition-colors border-b border-border/50"
             >

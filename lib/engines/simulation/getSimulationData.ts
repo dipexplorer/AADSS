@@ -11,7 +11,17 @@ export async function getSimulationData(
 ): Promise<SubjectSimInput[]> {
   const supabase = createClient();
 
-  // Fetch subjects
+  // 1. Fetch academic session info (Start date is critical for accurate filtering)
+  const { data: sessionData } = await supabase
+    .from("academic_sessions")
+    .select("start_date, end_date")
+    .eq("id", sessionId)
+    .single();
+
+  const sessionStart = sessionData?.start_date ?? "1970-01-01";
+  const sessionEnd = sessionData?.end_date ?? new Date().toISOString().split("T")[0];
+
+  // 2. Fetch subjects
   const { data: subjects } = await supabase
     .from("subjects")
     .select("id, name, min_attendance_required")
@@ -21,65 +31,65 @@ export async function getSimulationData(
 
   const subjectIds = subjects.map((s) => s.id);
 
-  // Fetch all sessions for this semester
+  // 3. Fetch past sessions ONLY (up to today) to calculate current status
+  const todayStr = new Date().toLocaleDateString("en-CA");
   const { data: sessions } = await supabase
     .from("class_sessions")
     .select("id, subject_id, date, status")
-    .in("subject_id", subjectIds);
+    .in("subject_id", subjectIds)
+    .gte("date", sessionStart)
+    .lte("date", todayStr);
 
-  // Fetch attendance
-  const sessionIds = (sessions ?? []).map((s) => s.id);
-  const { data: attendance } = await supabase
-    .from("attendance")
-    .select("class_session_id, status")
-    .eq("student_id", studentProfileId)
-    .in("class_session_id", sessionIds);
+  const filteredSessions = sessions ?? [];
+  const sessionIds = filteredSessions.map((s) => s.id);
 
-  const attendanceMap = new Map(
-    (attendance ?? []).map((a) => [a.class_session_id, a.status]),
-  );
+  // 4. Fetch attendance for these sessions
+  let attendanceMap = new Map<string, string>();
+  if (sessionIds.length > 0) {
+    const { data: attendance } = await supabase
+      .from("attendance")
+      .select("class_session_id, status")
+      .eq("student_id", studentProfileId)
+      .in("class_session_id", sessionIds);
 
-  // Get session's end date for remaining classes estimate
-  const { data: sessionData } = await supabase
-    .from("academic_sessions")
-    .select("end_date")
-    .eq("id", sessionId)
-    .single();
+    attendanceMap = new Map(
+      (attendance ?? []).map((a) => [a.class_session_id, a.status]),
+    );
+  }
 
+  // 5. Remaining classes estimate
   const today = new Date();
-  const endDate = sessionData?.end_date
-    ? new Date(sessionData.end_date)
-    : today;
+  const endDate = new Date(sessionEnd);
   const daysRemaining = Math.max(
     0,
     Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
   );
   const weeksRemaining = daysRemaining / 7;
 
+  // 6. Map to dashboard reality
   return subjects.map((subject) => {
-    const subjectSessions = (sessions ?? []).filter(
+    const subjectSessions = filteredSessions.filter(
       (s) => s.subject_id === subject.id && s.status !== "cancelled",
     );
 
     let present = 0;
     let absent = 0;
-    let cancelled = 0;
 
     subjectSessions.forEach((session) => {
       const status = attendanceMap.get(session.id);
       if (status === "present") present++;
-      else if (status === "absent") absent++;
-      else if (status === "cancelled") cancelled++;
+      else absent++; // Default is absent for passed sessions with no mark
     });
 
-    // Estimate remaining classes from timetable frequency
-    // Fetch weekly freq from sessions in last 4 weeks
+    // Estimate remaining classes robustly
+    // We check how many sessions existed in the past few weeks to get frequency
     const recentSessions = subjectSessions.filter((s) => {
       const d = new Date(s.date);
       const fourWeeksAgo = new Date();
       fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
       return d >= fourWeeksAgo && d <= today;
     });
+    
     const weeklyFreq = recentSessions.length / 4 || 1;
     const remainingClasses = Math.round(weeklyFreq * weeksRemaining);
 
@@ -88,8 +98,8 @@ export async function getSimulationData(
       name: subject.name,
       present,
       absent,
-      cancelled,
-      totalClasses: present + absent,
+      cancelled: 0, // Not needed for primary sim logic
+      totalClasses: present + absent, 
       remainingClasses,
       minAttendanceRequired: subject.min_attendance_required ?? 75,
     };

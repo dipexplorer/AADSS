@@ -1,4 +1,4 @@
-// app/semester-configuration/page.tsx
+// app/timetable/page.tsx
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStudentProfile } from "@/lib/attendance/getStudentProfile";
@@ -7,7 +7,7 @@ import TimetableClient from "./TimetableClient";
 
 export const metadata = { title: "My Timetable — Acadence" };
 
-export default async function SemesterConfigurationPage() {
+export default async function TimetablePage() {
   const supabase = createClient();
   const {
     data: { user },
