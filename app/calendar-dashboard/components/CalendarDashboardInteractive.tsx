@@ -3,11 +3,8 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  getSubjectsWithStatsClient,
-  getOverallAttendanceStatsClient,
-  SubjectWithStats,
-} from "@/lib/attendance/getSubjectsWithStatsClient";
+import { getAnalyticsSummary } from "@/lib/engines/analytics/getAnalyticsSummary";
+import type { SubjectAnalytics } from "@/lib/engines/analytics/types";
 import YearNavigator from "@/app/calendar-dashboard/components/YearNavigator";
 import MonthCalendar from "@/app/calendar-dashboard/components/MonthCalendar";
 import SemesterInfoPanel from "@/app/calendar-dashboard/components/SemesterInfoPanel";
@@ -36,7 +33,7 @@ export default function CalendarDashboardInteractive({
   // Default to the current real-world year so the calendar always centers reliably
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
-  const [subjects, setSubjects] = useState<SubjectWithStats[]>([]);
+  const [subjects, setSubjects] = useState<SubjectAnalytics[]>([]);
   const [overallStats, setOverallStats] = useState({
     percentage: 0,
     attended: 0,
@@ -49,27 +46,31 @@ export default function CalendarDashboardInteractive({
 
   const semesterStart = profile.academic_sessions?.start_date ?? "";
   const semesterEnd = profile.academic_sessions?.end_date ?? "";
+  const sessionId = profile.academic_sessions?.id ?? "";
 
   useEffect(() => {
     async function fetchStats() {
-      if (!profile.semester_id || !profile.id) {
+      if (!profile.semester_id || !profile.id || !sessionId) {
         setLoading(false);
         return;
       }
 
       setLoading(true);
       try {
-        const [subjectsResult, statsResult] = await Promise.all([
-          getSubjectsWithStatsClient(profile.semester_id, profile.id),
-          getOverallAttendanceStatsClient(profile.semester_id, profile.id),
-        ]);
+        const { data, error } = await getAnalyticsSummary(
+          profile.semester_id,
+          profile.id,
+          sessionId,
+        );
 
-        setSubjects(subjectsResult.data ?? []);
-        setOverallStats({
-          percentage: statsResult.percentage,
-          attended: statsResult.attended,
-          total: statsResult.total,
-        });
+        if (data) {
+          setSubjects(data.subjects ?? []);
+          setOverallStats({
+            percentage: data.overall.overallPercentage,
+            attended: data.overall.presentClasses,
+            total: data.overall.totalClasses,
+          });
+        }
       } catch (err) {
         console.error("Error fetching stats:", err);
       } finally {
@@ -78,7 +79,7 @@ export default function CalendarDashboardInteractive({
     }
 
     fetchStats();
-  }, [profile.semester_id, profile.id, refetchTrigger]);
+  }, [profile.semester_id, profile.id, sessionId, refetchTrigger]);
 
   // Real-time synchronization
   useEffect(() => {

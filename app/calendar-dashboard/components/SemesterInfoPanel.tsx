@@ -2,13 +2,13 @@
 "use client";
 
 import Link from "next/link";
-import { SubjectWithStats } from "@/lib/attendance/getSubjectsWithStatsClient";
+import type { SubjectAnalytics } from "@/lib/engines/analytics/types";
 
 interface SemesterInfoPanelProps {
   semesterStart: string;
   semesterEnd: string;
   overallPercentage: number;
-  subjects: SubjectWithStats[];
+  subjects: SubjectAnalytics[];
   loading: boolean;
   className?: string;
 }
@@ -190,19 +190,19 @@ export default function SemesterInfoPanel({
           {displaySubjects.length > 0 ? (
             displaySubjects.map((subject) => (
               <div
-                key={subject.id}
+                key={subject.subjectId}
                 className="p-4 rounded-xl border border-border shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] flex items-start gap-3 bg-card transition-all"
               >
                 <div
                   className={`mt-0.5 shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white ${
-                    subject.status === "safe"
+                    subject.riskLevel === "safe"
                       ? "bg-green-500"
-                      : subject.status === "warning"
+                      : subject.riskLevel === "warning"
                       ? "bg-yellow-500"
                       : "bg-red-600"
                   }`}
                 >
-                  {subject.status === "safe" ? (
+                  {subject.riskLevel === "safe" ? (
                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                      </svg>
@@ -214,23 +214,23 @@ export default function SemesterInfoPanel({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-extrabold text-foreground uppercase tracking-wide mb-1">
-                    {subject.name}
+                    {subject.subjectName}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
                       className={`text-xs font-black ${
-                        subject.status === "safe"
+                        subject.riskLevel === "safe"
                           ? "text-green-600"
-                          : subject.status === "warning"
+                          : subject.riskLevel === "warning"
                           ? "text-yellow-600"
                           : "text-red-600"
                       }`}
                     >
                       {subject.attendancePercentage}%
                     </span>
-                    {subject.requiredClasses > 0 && (
+                    {subject.classesNeededToRecover > 0 && (
                       <span className="text-[0.65rem] text-muted-foreground font-medium">
-                        Attend <strong className="font-bold text-foreground">{subject.requiredClasses}</strong> more class{subject.requiredClasses > 1 ? "es" : ""} to reach {subject.minAttendanceRequired}%
+                        Attend <strong className="font-bold text-foreground">{subject.classesNeededToRecover}</strong> more class{subject.classesNeededToRecover > 1 ? "es" : ""} to reach {subject.requiredPercentage}%
                       </span>
                     )}
                   </div>
