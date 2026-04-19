@@ -12,8 +12,8 @@ export function runSimulation(
   action: SimAction,
 ): SimulationOutput {
   let subjectsAffected = 0;
-  let hasRisky = false;
-  let hasCritical = false;
+  let subjectsAlreadyAtRisk = 0;
+  let subjectsBecomeUnrecoverable = 0;
 
   const results: SubjectSimulationResult[] = subjects.map((sub) => {
     const currentPct =
@@ -34,15 +34,31 @@ export function runSimulation(
     const simulatedPct = newTotal > 0 ? (newPresent / newTotal) * 100 : 100;
     const cleanSimulatedPct = Math.round(simulatedPct * 10) / 10;
 
-    const maxPossibleTotal = sub.totalClasses + sub.remainingClasses;
-    const maxPossiblePresent = sub.present + sub.remainingClasses;
+    const minAtt = sub.minAttendanceRequired;
+    const bufferPct = Math.round((cleanSimulatedPct - minAtt) * 10) / 10;
+
+    // Remaining classes after the action
+    const simulatedRemainingClasses = Math.max(
+      0,
+      sub.remainingClasses - action.count,
+    );
+
+    const maxPossibleTotal = newTotal + simulatedRemainingClasses;
+    const maxPossiblePresent = newPresent + simulatedRemainingClasses;
     const maxPossiblePct =
       maxPossibleTotal > 0
         ? (maxPossiblePresent / maxPossibleTotal) * 100
         : 100;
     const cleanMaxPossiblePct = Math.round(maxPossiblePct * 10) / 10;
+    const isMathematicallyUnrecoverable = cleanMaxPossiblePct < minAtt;
 
-    const minAtt = sub.minAttendanceRequired;
+    // Was it unrecoverable before?
+    const currentMaxTotal = sub.totalClasses + sub.remainingClasses;
+    const currentMaxPresent = sub.present + sub.remainingClasses;
+    const currentMaxPct =
+      currentMaxTotal > 0 ? (currentMaxPresent / currentMaxTotal) * 100 : 100;
+    const wasUnrecoverable = Math.round(currentMaxPct * 10) / 10 < minAtt;
+
     const alreadyBelowThreshold = currentPct < minAtt;
     const isSafeAfterAction = cleanSimulatedPct >= minAtt;
     const wouldDropBelowThreshold =
@@ -58,21 +74,25 @@ export function runSimulation(
         );
     }
 
-    const simulatedRemainingClasses = Math.max(
-      0,
-      sub.remainingClasses - action.count,
-    );
     const isRecoveryPossible =
       isFinite(classesNeededToRecover) &&
       classesNeededToRecover <= simulatedRemainingClasses;
 
+    // Confidence Level
+    let confidenceLevel: "Low" | "Medium" | "High" = "Low";
+    if (sub.totalClasses >= 5 && sub.totalClasses < 15) confidenceLevel = "Medium";
+    else if (sub.totalClasses >= 15) confidenceLevel = "High";
+
+    if (alreadyBelowThreshold) {
+      subjectsAlreadyAtRisk++;
+    }
+
     if (action.mode === "skip") {
       if (wouldDropBelowThreshold) {
         subjectsAffected++;
-        hasRisky = true;
       }
-      if (alreadyBelowThreshold) {
-        hasCritical = true;
+      if (!wasUnrecoverable && isMathematicallyUnrecoverable) {
+        subjectsBecomeUnrecoverable++;
       }
     }
 
@@ -88,19 +108,29 @@ export function runSimulation(
       alreadyBelowThreshold,
       classesNeededToRecover,
       isRecoveryPossible,
+      isMathematicallyUnrecoverable,
       totalClasses: sub.totalClasses,
+      confidenceLevel,
+      bufferPct,
     };
   });
 
-  let overallDecision: SimulationSummary["overallDecision"] = "Safe";
+  let overallDecision: SimulationSummary["overallDecision"] =
+    action.mode === "attend" ? "Keep Attending" : "Safe";
+
   if (action.mode === "skip") {
-    if (hasCritical) overallDecision = "Not Recommended";
-    else if (hasRisky) overallDecision = "Risky";
+    if (subjectsAlreadyAtRisk > 0 || subjectsBecomeUnrecoverable > 0) {
+      overallDecision = "Do Not Skip";
+    } else if (subjectsAffected > 0) {
+      overallDecision = "Risky";
+    }
   }
 
   const summary: SimulationSummary = {
     overallDecision,
     subjectsAffected,
+    subjectsAlreadyAtRisk,
+    subjectsBecomeUnrecoverable,
     action,
   };
 

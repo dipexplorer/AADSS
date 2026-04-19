@@ -31,14 +31,19 @@ export interface SubjectSimulationResult {
   // Recovery
   classesNeededToRecover: number;
   isRecoveryPossible: boolean;
+  isMathematicallyUnrecoverable: boolean; // if maxPossible < target
   
-  // Confidence
+  // Confidence & Buffer
   totalClasses: number;
+  confidenceLevel: "Low" | "Medium" | "High";
+  bufferPct: number; // distance from min requirement (can be negative)
 }
 
 export interface SimulationSummary {
-  overallDecision: "Safe" | "Risky" | "Not Recommended";
-  subjectsAffected: number; // How many drop below threshold because of this action
+  overallDecision: "Safe" | "Risky" | "Do Not Skip" | "Keep Attending";
+  subjectsAffected: number; // Drops below threshold specifically due to action
+  subjectsAlreadyAtRisk: number;
+  subjectsBecomeUnrecoverable: number;
   action: SimAction;
 }
 

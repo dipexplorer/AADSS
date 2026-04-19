@@ -3,19 +3,18 @@
 
 import { useState, useMemo } from "react";
 import { runSimulation } from "@/lib/engines/simulation/runSimulation";
-import { SubjectSimInput, SubjectSimulationResult } from "@/lib/engines/simulation/types";
+import { SubjectSimInput, SubjectSimulationResult, SimAction } from "@/lib/engines/simulation/types";
 
 interface Props {
   subjects: SubjectSimInput[];
 }
 
 export default function SimulateClient({ subjects }: Props) {
-  const [actionMode, setActionMode] = useState<"skip" | "attend">("skip");
-  const [count, setCount] = useState(1);
+  const [action, setAction] = useState<SimAction>({ mode: "skip", count: 1 });
 
   const simulation = useMemo(
-    () => runSimulation(subjects, { mode: actionMode, count }),
-    [subjects, actionMode, count],
+    () => runSimulation(subjects, action),
+    [subjects, action],
   );
 
   if (subjects.length === 0) {
@@ -28,140 +27,174 @@ export default function SimulateClient({ subjects }: Props) {
     );
   }
 
-  const { overallDecision, subjectsAffected, action } = simulation.summary;
+  const {
+    overallDecision,
+    subjectsAffected,
+    subjectsBecomeUnrecoverable,
+    action: simAction
+  } = simulation.summary;
+
+  // Extract which subjects are explicitly affected for a smarter summary
+  const affectedSubjectsNames = simulation.subjects
+    .filter(s => s.wouldDropBelowThreshold)
+    .map(s => s.name);
+    
+  const fatalSubjectsNames = simulation.subjects
+    .filter(s => s.isMathematicallyUnrecoverable && !s.alreadyBelowThreshold)
+    .map(s => s.name);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Simulation Engine</h1>
-        <p className="text-muted-foreground mt-1">
-          Make data-driven decisions about your attendance
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-foreground tracking-tight">Simulation Engine</h1>
+        <p className="text-muted-foreground mt-1 text-lg">
+          Make data-driven decisions about your attendance.
         </p>
       </div>
 
-      {/* Action Selector */}
-      <div className="bg-card border border-border/50 rounded-2xl p-5 mb-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-          <div className="flex bg-muted/50 p-1.5 rounded-xl w-full sm:w-auto">
+      {/* Premium Action Configuration Panel */}
+      <div className="bg-card border border-border/80 rounded-[2rem] p-6 shadow-sm mb-8 flex flex-col md:flex-row items-center gap-8">
+        <div className="flex-1 w-full">
+          <h3 className="text-sm font-bold uppercase tracking-wider mb-3 text-muted-foreground ml-1">What is your intent?</h3>
+          <div className="grid grid-cols-2 gap-2 p-1.5 bg-muted/40 rounded-2xl border border-muted">
             <button
-              onClick={() => setActionMode("skip")}
-              className={`flex-1 sm:px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
-                actionMode === "skip"
-                  ? "bg-card shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+              onClick={() => setAction({ mode: "skip", count: action.mode === 'skip' ? action.count : 1 })}
+              className={`py-3 text-sm font-bold rounded-xl transition-all ${
+                action.mode === "skip"
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
-              Skip
+              Want to Skip
             </button>
             <button
-              onClick={() => setActionMode("attend")}
-              className={`flex-1 sm:px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
-                actionMode === "attend"
-                  ? "bg-card shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+              onClick={() => setAction({ mode: "attend", count: action.mode === 'attend' ? action.count : 1 })}
+              className={`py-3 text-sm font-bold rounded-xl transition-all ${
+                action.mode === "attend"
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
-              Attend
+              Plan to Attend
             </button>
           </div>
-          <div className="flex items-center gap-4 w-full sm:flex-1 bg-muted/30 px-4 py-2 rounded-xl">
-            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-              classes:
-            </span>
-            <input
-              type="range"
-              min={1}
-              max={10}
-              value={count}
-              onChange={(e) => setCount(Number(e.target.value))}
-              className="flex-1 accent-primary h-2 bg-muted rounded-full appearance-none cursor-pointer"
-            />
-            <span className="font-bold text-xl text-primary w-6 text-center tabular-nums">
-              {count}
-            </span>
+        </div>
+
+        <div className="w-full md:w-auto mt-2 md:mt-0 flex flex-col items-center md:border-l border-border md:pl-10">
+          <p className="text-sm font-bold uppercase tracking-wider mb-3 text-muted-foreground">How many classes?</p>
+          <div className="flex items-center gap-4 bg-muted/40 px-6 py-3 rounded-2xl border border-muted">
+            <button
+              onClick={() => setAction(prev => ({ ...prev, count: Math.max(1, prev.count - 1) }))}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-background border shadow-sm text-foreground hover:bg-muted transition-colors font-medium text-lg"
+            >
+              −
+            </button>
+            <div className="flex flex-col items-center w-8">
+               <span className="text-3xl font-black tabular-nums leading-none">{action.count}</span>
+            </div>
+            <button
+              onClick={() => setAction(prev => ({ ...prev, count: Math.min(20, prev.count + 1) }))}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-background border shadow-sm text-foreground hover:bg-muted transition-colors font-medium text-lg"
+            >
+              +
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Top Level Decision Summary */}
+      {/* Upgraded Global Impact Banner */}
       <div
-        className={`mb-8 p-5 rounded-2xl border ${
-          actionMode === "skip"
+        className={`mb-10 p-6 rounded-[2rem] border-2 transition-colors duration-300 ${
+          simAction.mode === "skip"
             ? overallDecision === "Safe"
               ? "bg-green-50/50 border-green-200 dark:bg-green-950/20 dark:border-green-900/50"
               : overallDecision === "Risky"
-                ? "bg-amber-50/50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50"
-                : "bg-red-50/50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50"
-            : "bg-blue-50/50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/50"
+                ? "bg-amber-50/50 border-amber-300 dark:bg-amber-950/30 dark:border-amber-700/50"
+                : "bg-red-50/50 border-red-300 dark:bg-red-950/30 dark:border-red-700/50"
+            : "bg-blue-50/50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800/50"
         }`}
       >
-        <div className="flex items-start gap-4">
-          <div className="mt-1">
-            {actionMode === "skip" ? (
+        <div className="flex flex-col sm:flex-row gap-6 items-start">
+          {/* Status Icon */}
+          <div className="mt-1 shrink-0 hidden sm:block">
+            {simAction.mode === "skip" ? (
               overallDecision === "Safe" ? (
-                <div className="bg-green-500/20 p-2 rounded-full hidden sm:block">
-                  <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
+                <div className="bg-green-500/20 p-3 rounded-2xl border border-green-500/20"><span className="text-2xl">✅</span></div>
               ) : overallDecision === "Risky" ? (
-                <div className="bg-amber-500/20 p-2 rounded-full hidden sm:block">
-                  <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
+                <div className="bg-amber-500/20 p-3 rounded-2xl border border-amber-500/20"><span className="text-2xl">⚠️</span></div>
               ) : (
-                <div className="bg-red-500/20 p-2 rounded-full hidden sm:block">
-                  <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
+                <div className="bg-red-500/20 p-3 rounded-2xl border border-red-500/20"><span className="text-2xl">❌</span></div>
               )
             ) : (
-              <div className="bg-blue-500/20 p-2 rounded-full hidden sm:block">
-                <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
+              <div className="bg-blue-500/20 p-3 rounded-2xl border border-blue-500/20"><span className="text-2xl">📈</span></div>
             )}
           </div>
-          <div>
-            <h2
-              className={`text-xl font-bold ${
-                actionMode === "skip"
+          
+          <div className="flex-1 w-full">
+            <h2 className={`text-2xl font-black tracking-tight mb-2 ${
+                simAction.mode === "skip"
                   ? overallDecision === "Safe"
-                    ? "text-green-700 dark:text-green-500"
+                    ? "text-green-800 dark:text-green-400"
                     : overallDecision === "Risky"
-                      ? "text-amber-700 dark:text-amber-500"
-                      : "text-red-700 dark:text-red-500"
-                  : "text-blue-700 dark:text-blue-500"
-              }`}
-            >
-              {actionMode === "attend"
-                ? "Excellent Effort"
+                      ? "text-amber-800 dark:text-amber-400"
+                      : "text-red-800 dark:text-red-400"
+                  : "text-blue-800 dark:text-blue-400"
+            }`}>
+              {simAction.mode === "attend"
+                ? "Decision: Keep Attending"
                 : overallDecision === "Safe"
-                  ? "Safe to Skip"
+                  ? "Decision: Safe to Skip"
                   : overallDecision === "Risky"
-                    ? "Risky Decision"
-                    : "Not Recommended"}
+                    ? "Decision: High Risk - Reconsider"
+                    : "Decision: Absolutely Do Not Skip"}
             </h2>
-            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-              {actionMode === "attend"
-                ? `Attending ${count} class${count > 1 ? "es" : ""} will significantly boost your attendance and provide a safety buffer for future.`
-                : overallDecision === "Safe"
-                  ? `Skipping ${count} class${count > 1 ? "es" : ""} won't drop any subject below the required threshold.`
-                  : overallDecision === "Risky"
-                    ? `Warning: Skipping will cause ${subjectsAffected} subject${subjectsAffected > 1 ? "s" : ""} to drop below the threshold.`
-                    : "You are already below the threshold in one or more subjects. Skipping is highly discouraged."}
+            
+            <p className="text-foreground/80 font-medium text-lg leading-relaxed">
+              If you {simAction.mode === "skip" ? "skip" : "attend"} exactly <strong className="text-foreground">{simAction.count} class{simAction.count !== 1 ? 'es' : ''}</strong> right now across all subjects:
             </p>
+
+            {/* Smart Contextual Impact Boxes */}
+            {simAction.mode === "skip" && (subjectsAffected > 0 || subjectsBecomeUnrecoverable > 0) && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {subjectsAffected > 0 && (
+                  <div className="bg-amber-100/50 dark:bg-amber-950/40 p-4 rounded-xl border border-amber-200 dark:border-amber-900">
+                    <h4 className="font-bold text-amber-900 dark:text-amber-400 flex items-center gap-2 mb-1">
+                       <span className="bg-amber-300 dark:bg-amber-800 text-amber-900 dark:text-amber-100 text-xs w-5 h-5 flex items-center justify-center rounded-full">{subjectsAffected}</span> Drop below minimum
+                    </h4>
+                    <p className="text-sm font-medium text-amber-800/80 dark:text-amber-500/90 leading-tight">
+                      {affectedSubjectsNames.join(", ")} will require immediate back-to-back recovery.
+                    </p>
+                  </div>
+                )}
+                
+                {subjectsBecomeUnrecoverable > 0 && (
+                  <div className="bg-red-100/50 dark:bg-red-950/40 p-4 rounded-xl border border-red-200 dark:border-red-900">
+                    <h4 className="font-bold text-red-900 dark:text-red-400 flex items-center gap-2 mb-1">
+                      <span className="bg-red-300 dark:bg-red-800 text-red-900 dark:text-red-100 text-xs w-5 h-5 flex items-center justify-center rounded-full">{subjectsBecomeUnrecoverable}</span> Become unrecoverable
+                    </h4>
+                    <p className="text-sm font-medium text-red-800/80 dark:text-red-500/90 leading-tight">
+                      {fatalSubjectsNames.join(", ")} will become medically irrecoverable for the semester.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {simAction.mode === "skip" && subjectsAffected === 0 && subjectsBecomeUnrecoverable === 0 && (
+               <div className="mt-4 bg-green-100/50 dark:bg-green-950/40 p-4 rounded-xl border border-green-200 dark:border-green-900 max-w-md">
+                 <h4 className="font-bold text-green-900 dark:text-green-400">Zero Dependencies Broken</h4>
+                 <p className="text-sm font-medium text-green-800/80 dark:text-green-500/90 leading-tight mt-1">
+                   All your subjects have enough buffer to absorb this skip without dropping below the threshold.
+                 </p>
+               </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Subject Results */}
-      <h3 className="font-semibold text-lg text-foreground mb-4 pl-1">Impact Analysis</h3>
-      <div className="space-y-4">
+      {/* Subject Results Grid */}
+      <h3 className="font-black text-xl text-foreground mb-5 pl-1 tracking-tight">Detailed Breakdown</h3>
+      <div className="space-y-5">
         {simulation.subjects.map((sub) => (
           <SubjectSimCard key={sub.subjectId} sub={sub} action={action.mode} count={action.count} />
         ))}
@@ -173,135 +206,137 @@ export default function SimulateClient({ subjects }: Props) {
 // ── Per-subject card ─────────────────────────────────────────────────────────
 
 function SubjectSimCard({ sub, action, count }: { sub: SubjectSimulationResult; action: "skip" | "attend"; count: number }) {
-  const isDanger = action === "skip" && (sub.wouldDropBelowThreshold || sub.alreadyBelowThreshold);
+  const isDanger = sub.wouldDropBelowThreshold || sub.alreadyBelowThreshold;
+  const isFatal = sub.isMathematicallyUnrecoverable && sub.simulatedPct < sub.minAttendanceRequired;
   const diffPct = sub.simulatedPct - sub.currentPct;
 
   return (
-    <div className={`bg-card border rounded-2xl p-5 overflow-hidden relative shadow-sm hover:shadow-md transition-shadow ${isDanger ? 'border-red-200 dark:border-red-900/50' : 'border-border'}`}>
-      {/* Danger Line Indicator */}
-      {isDanger && (
-        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500"></div>
-      )}
-
-      {/* Header Row: Subject Name & Status Badge */}
-      <div className="flex items-center justify-between mb-5 pl-1">
+    <div className={`bg-card border-2 rounded-[2rem] p-6 overflow-hidden relative shadow-sm hover:shadow-md transition-all ${
+      isFatal ? 'border-red-400 dark:border-red-800 bg-red-50/10' : isDanger ? 'border-amber-300 dark:border-amber-900/50 bg-amber-50/10' : 'border-border'
+    }`}>
+      
+      {/* Header Row */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4 pl-1">
         <div>
-          <h4 className="font-bold text-foreground text-lg">{sub.name}</h4>
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-            <span className="flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Min. Req: {sub.minAttendanceRequired}%
-            </span>
-            <span className="text-border mx-0.5">•</span>
-            <span>Total classes so far: {sub.totalClasses}</span>
-          </p>
+          <h4 className="font-black text-foreground text-xl tracking-tight mb-2">{sub.name}</h4>
+          
+          <div className="flex flex-wrap items-center gap-3">
+             <div className="bg-foreground text-background px-3 py-1 rounded-lg text-xs font-bold shadow-sm">
+               Target: {sub.minAttendanceRequired}%
+             </div>
+             
+             {/* Dynamic Confidence Meter */}
+             <div className="group relative flex items-center gap-2 bg-muted/40 px-3 py-1.5 rounded-lg border border-border cursor-help pointer-events-auto">
+               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Confidence</span>
+               <div className="w-16 h-2 bg-muted rounded-full overflow-hidden border border-border/50">
+                 <div className={`h-full ${sub.confidenceLevel === "High" ? "bg-green-500" : sub.confidenceLevel === "Medium" ? "bg-amber-500" : "bg-red-500"}`} 
+                      style={{width: sub.confidenceLevel === "High" ? '100%' : sub.confidenceLevel === "Medium" ? '66%' : '33%'}} />
+               </div>
+               {/* Tooltip */}
+               <div className="absolute top-full left-0 mt-2 w-56 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-xs p-3 rounded-xl shadow-xl pointer-events-none z-10 font-medium">
+                 Based on {sub.totalClasses} classes elapsed. {sub.confidenceLevel === 'Low' ? 'High volatility—single absences will cause massive swings.' : 'Stable—the percentage is a strong reflection of reality.'}
+               </div>
+             </div>
+          </div>
         </div>
-        <div>
-          {action === "skip" ? (
-             sub.alreadyBelowThreshold ? (
-               <span className="inline-flex items-center gap-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-3 py-1.5 rounded-full text-xs font-bold">
-                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
-                 Already at Risk
+
+        <div className="shrink-0 flex flex-col items-start sm:items-end gap-2">
+             {sub.alreadyBelowThreshold ? (
+               <span className="inline-flex items-center gap-2 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 px-4 py-2 rounded-xl text-sm font-black border border-red-200 dark:border-red-800 shadow-sm">
+                 <span className="text-base leading-none">❌</span> Already Below Threshold
                </span>
              ) : sub.wouldDropBelowThreshold ? (
-               <span className="inline-flex items-center gap-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-xs font-bold">
-                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                 Drops below threshold
+               <span className="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-400 px-4 py-2 rounded-xl text-sm font-black border border-amber-200 dark:border-amber-800 shadow-sm">
+                 <span className="text-base leading-none">⚠️</span> At Risk of Breaching
                </span>
              ) : (
-               <span className="inline-flex items-center gap-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-full text-xs font-bold">
-                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                 Safe to Skip
+               <span className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400 px-4 py-2 rounded-xl text-sm font-black border border-green-200 dark:border-green-800 shadow-sm">
+                 <span className="text-base leading-none">✅</span> Comfortable Buffer
                </span>
-             )
-          ) : (
-             <span className="inline-flex items-center gap-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-full text-xs font-bold">
-               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-               Building Buffer
-             </span>
-          )}
+             )}
+             
+             {sub.bufferPct >= 0 && !sub.alreadyBelowThreshold && (
+               <div className="text-xs font-bold text-muted-foreground mr-1">
+                 Current margin: <span className="text-green-600 dark:text-green-500">+{sub.bufferPct}%</span> extra
+               </div>
+             )}
         </div>
       </div>
 
-      {/* Main Metric Row */}
-      <div className="flex items-center gap-3 sm:gap-6 ml-1 mb-5">
-        <div className="flex-1 bg-muted/40 rounded-xl p-4 transition-colors">
-          <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Current</p>
-          <p className="text-2xl font-bold text-foreground tabular-nums">{sub.currentPct}%</p>
+      {/* Main Metric Row (Current -> Future) */}
+      <div className="flex items-center gap-4 sm:gap-6 ml-1 mb-6">
+        <div className="flex-1 bg-muted/30 rounded-2xl p-5 border border-transparent">
+          <p className="text-xs text-muted-foreground mb-1 font-bold uppercase tracking-widest opacity-80">Current status</p>
+          <p className="text-3xl font-black text-foreground tabular-nums tracking-tight">{sub.currentPct}%</p>
         </div>
         
-        <div className="flex flex-col items-center">
-          <div className={`text-xs font-bold mb-1 ${diffPct >= 0 ? "text-green-600" : "text-red-500"}`}>
+        <div className="flex flex-col items-center justify-center -mt-2">
+          <div className={`text-sm font-black mb-1 bg-background px-3 py-1 rounded-full shadow-sm border ${diffPct >= 0 ? "text-green-600 border-green-100" : "text-red-600 border-red-100"}`}>
             {diffPct >= 0 ? "+" : ""}{(Math.round(diffPct * 10) / 10).toFixed(1)}%
           </div>
-          <svg className="w-6 h-6 text-muted-foreground shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-          </svg>
+          <svg className="w-8 h-8 text-muted-foreground/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
         </div>
 
-        <div className={`flex-1 rounded-xl p-4 transition-colors ${
-          action === "skip" && sub.simulatedPct < sub.minAttendanceRequired
-            ? "bg-red-50 dark:bg-red-950/20 shadow-sm shadow-red-500/10"
+        <div className={`flex-1 rounded-2xl p-5 border shadow-sm transition-all ${
+          sub.simulatedPct < sub.minAttendanceRequired
+            ? "bg-red-50 dark:bg-red-950/20 shadow-red-500/10 border-red-200 dark:border-red-900/50"
             : action === "attend" && sub.simulatedPct >= sub.minAttendanceRequired 
-              ? "bg-blue-50 dark:bg-blue-950/20 shadow-sm shadow-blue-500/10"
-              : "bg-green-50 dark:bg-green-950/20 shadow-sm shadow-green-500/10"
+              ? "bg-blue-50 dark:bg-blue-950/20 shadow-blue-500/10 border-blue-200 dark:border-blue-900/50"
+              : "bg-green-50 dark:bg-green-950/20 shadow-green-500/10 border-green-200 dark:border-green-900/50"
         }`}>
-          <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold opacity-80">
-            {action === "skip" ? "If you skip" : "If you attend"}
+          <p className={`text-xs mb-1 font-bold uppercase tracking-widest ${sub.simulatedPct < sub.minAttendanceRequired ? 'text-red-600/80' : 'text-muted-foreground/80'}`}>
+            If you {action} {count}
           </p>
-          <p className={`text-2xl font-bold tabular-nums ${
-            sub.simulatedPct < sub.minAttendanceRequired ? "text-red-600 dark:text-red-500" : "text-green-600 dark:text-green-500"
+          <p className={`text-3xl font-black tabular-nums tracking-tight ${
+            sub.simulatedPct < sub.minAttendanceRequired ? "text-red-700 dark:text-red-500" : "text-green-700 dark:text-green-500"
           }`}>
             {sub.simulatedPct}%
           </p>
         </div>
       </div>
 
-      {/* Actionable Insights Footer */}
-      <div className="bg-muted/30 border border-muted rounded-xl p-4 ml-1 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
-        {/* Recovery Section */}
+      {/* Constraints Footer */}
+      <div className="bg-muted/30 border border-muted/80 rounded-2xl p-5 flex flex-col sm:flex-row gap-6 sm:items-center justify-between ml-1">
+        {/* Recovery Instructions */}
         {sub.simulatedPct < sub.minAttendanceRequired ? (
-          <div className="flex items-start gap-3">
-             <div className="bg-red-100 dark:bg-red-950 p-1.5 rounded-md mt-0.5 shrink-0">
-               <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-               </svg>
-             </div>
-             <div>
-               <p className="text-sm font-semibold text-foreground">Recovery Action Required</p>
-               {sub.isRecoveryPossible ? (
-                 <p className="text-sm text-muted-foreground mt-0.5">
-                   You must attend the <strong className="text-foreground">next {sub.classesNeededToRecover} classes</strong> to recover to {sub.minAttendanceRequired}%.
+             <div className="flex-1">
+               <p className="text-sm font-black text-red-700 dark:text-red-400 mb-1 flex items-center gap-2">
+                 <span>🚨</span> Remediation Required
+               </p>
+               {sub.isMathematicallyUnrecoverable ? (
+                 <p className="text-sm font-bold text-red-600 leading-tight">
+                   Mathematically impossible. Even if you attend all future classes, your max cap is strictly {sub.maxPossiblePct}% (&lt; {sub.minAttendanceRequired}%).
+                 </p>
+               ) : sub.isRecoveryPossible ? (
+                 <p className="text-sm text-foreground font-medium leading-tight">
+                   To survive, you will need to actively attend the <strong className="text-amber-600 font-bold bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">next {sub.classesNeededToRecover} class{sub.classesNeededToRecover > 1 ? 'es' : ''}</strong> without fail.
                  </p>
                ) : (
-                 <p className="text-sm text-red-500 mt-0.5 font-medium">
-                   Cannot recover. Not enough classes left in the semester.
+                 <p className="text-sm font-bold text-red-600 leading-tight">
+                   Cannot recover. Only {Math.max(0, sub.remainingClasses - (action === 'skip' ? count : 0))} classes left, but you need {sub.classesNeededToRecover}.
                  </p>
                )}
              </div>
-          </div>
         ) : (
-          <div className="flex items-start gap-3">
-             <div className="bg-primary/10 p-1.5 rounded-md mt-0.5 shrink-0">
-               <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-               </svg>
-             </div>
-             <div>
-               <p className="text-sm font-semibold text-foreground">Current standing is solid</p>
-               <p className="text-sm text-muted-foreground mt-0.5">
-                 Attendance remains above eligibility requirement.
+             <div className="flex-1 pl-1">
+               <p className="text-sm font-black text-foreground mb-1 flex items-center gap-2">
+                 <span>🛡️</span> Security Verified
+               </p>
+               <p className="text-sm text-muted-foreground font-medium">
+                 Your attendance is resilient against this change. No immediate threat.
                </p>
              </div>
-          </div>
         )}
 
-        {/* Max Possible Constraint */}
-        <div className="sm:text-right shrink-0 mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-muted">
-          <p className="text-xs text-muted-foreground tracking-wide uppercase mb-1">Max Possible</p>
-          <p className="text-sm font-bold text-foreground">
-            {sub.maxPossiblePct}% <span className="font-normal text-muted-foreground whitespace-nowrap ml-1">(if no more skips)</span>
+        {/* Hard Limits */}
+        <div className="sm:text-right shrink-0 pt-4 sm:pt-0 border-t sm:border-t-0 border-border">
+          <p className="text-xs text-muted-foreground font-bold tracking-widest uppercase mb-1.5 flex items-center justify-start sm:justify-end gap-1.5 cursor-help" title="Highest attendance technically achievable this semester.">
+            Max Potential Cap
+            <svg className="w-4 h-4 text-muted-foreground/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </p>
+          <div className={`inline-flex items-center justify-center px-4 py-2 rounded-xl border ${sub.maxPossiblePct < sub.minAttendanceRequired ? 'bg-red-50 border-red-200 text-red-700 font-black' : 'bg-background border-border text-foreground font-bold'}`}>
+            <span className="text-lg">{sub.maxPossiblePct}%</span>
+          </div>
         </div>
       </div>
     </div>
