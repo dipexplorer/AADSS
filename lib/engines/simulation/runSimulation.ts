@@ -110,6 +110,7 @@ export function runSimulation(
       isRecoveryPossible,
       isMathematicallyUnrecoverable,
       totalClasses: sub.totalClasses,
+      remainingClasses: sub.remainingClasses,
       confidenceLevel,
       bufferPct,
     };

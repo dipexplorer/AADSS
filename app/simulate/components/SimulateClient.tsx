@@ -30,9 +30,13 @@ export default function SimulateClient({ subjects }: Props) {
   const {
     overallDecision,
     subjectsAffected,
+    subjectsAlreadyAtRisk,
     subjectsBecomeUnrecoverable,
     action: simAction
   } = simulation.summary;
+
+  // Find the maximum possible simulation range
+  const maxSimulatableClasses = Math.max(...subjects.map(s => s.remainingClasses), 1);
 
   // Extract which subjects are explicitly affected for a smarter summary
   const affectedSubjectsNames = simulation.subjects
@@ -93,7 +97,7 @@ export default function SimulateClient({ subjects }: Props) {
                <span className="text-3xl font-black tabular-nums leading-none">{action.count}</span>
             </div>
             <button
-              onClick={() => setAction(prev => ({ ...prev, count: Math.min(20, prev.count + 1) }))}
+              onClick={() => setAction(prev => ({ ...prev, count: Math.min(maxSimulatableClasses, prev.count + 1) }))}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-background border shadow-sm text-foreground hover:bg-muted transition-colors font-medium text-lg"
             >
               +
@@ -209,6 +213,7 @@ function SubjectSimCard({ sub, action, count }: { sub: SubjectSimulationResult; 
   const isDanger = sub.wouldDropBelowThreshold || sub.alreadyBelowThreshold;
   const isFatal = sub.isMathematicallyUnrecoverable && sub.simulatedPct < sub.minAttendanceRequired;
   const diffPct = sub.simulatedPct - sub.currentPct;
+  const isPhysicallyImpossible = count > sub.remainingClasses;
 
   return (
     <div className={`bg-card border-2 rounded-[2rem] p-6 overflow-hidden relative shadow-sm hover:shadow-md transition-all ${
@@ -218,7 +223,7 @@ function SubjectSimCard({ sub, action, count }: { sub: SubjectSimulationResult; 
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4 pl-1">
         <div>
-          <h4 className="font-black text-foreground text-xl tracking-tight mb-2">{sub.name}</h4>
+          <h4 className="font-black text-foreground text-xl tracking-tight mb-2 uppercase">{sub.name}</h4>
           
           <div className="flex flex-wrap items-center gap-3">
              <div className="bg-foreground text-background px-3 py-1 rounded-lg text-xs font-bold shadow-sm">
@@ -243,21 +248,21 @@ function SubjectSimCard({ sub, action, count }: { sub: SubjectSimulationResult; 
         <div className="shrink-0 flex flex-col items-start sm:items-end gap-2">
              {sub.alreadyBelowThreshold ? (
                <span className="inline-flex items-center gap-2 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 px-4 py-2 rounded-xl text-sm font-black border border-red-200 dark:border-red-800 shadow-sm">
-                 <span className="text-base leading-none">❌</span> Already Below Threshold
+                 <span className="text-base leading-none">❌</span> Below Threshold
                </span>
              ) : sub.wouldDropBelowThreshold ? (
                <span className="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-400 px-4 py-2 rounded-xl text-sm font-black border border-amber-200 dark:border-amber-800 shadow-sm">
-                 <span className="text-base leading-none">⚠️</span> At Risk of Breaching
+                 <span className="text-base leading-none">⚠️</span> At Risk
                </span>
              ) : (
                <span className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400 px-4 py-2 rounded-xl text-sm font-black border border-green-200 dark:border-green-800 shadow-sm">
-                 <span className="text-base leading-none">✅</span> Comfortable Buffer
+                 <span className="text-base leading-none">✅</span> Safe
                </span>
              )}
              
              {sub.bufferPct >= 0 && !sub.alreadyBelowThreshold && (
                <div className="text-xs font-bold text-muted-foreground mr-1">
-                 Current margin: <span className="text-green-600 dark:text-green-500">+{sub.bufferPct}%</span> extra
+                 Current margin: <span className="text-green-600 dark:text-green-500">+{sub.bufferPct}%</span>
                </div>
              )}
         </div>
@@ -266,7 +271,7 @@ function SubjectSimCard({ sub, action, count }: { sub: SubjectSimulationResult; 
       {/* Main Metric Row (Current -> Future) */}
       <div className="flex items-center gap-4 sm:gap-6 ml-1 mb-6">
         <div className="flex-1 bg-muted/30 rounded-2xl p-5 border border-transparent">
-          <p className="text-xs text-muted-foreground mb-1 font-bold uppercase tracking-widest opacity-80">Current status</p>
+          <p className="text-xs text-muted-foreground mb-1 font-bold uppercase tracking-widest opacity-80">Current</p>
           <p className="text-3xl font-black text-foreground tabular-nums tracking-tight">{sub.currentPct}%</p>
         </div>
         
@@ -277,7 +282,7 @@ function SubjectSimCard({ sub, action, count }: { sub: SubjectSimulationResult; 
           <svg className="w-8 h-8 text-muted-foreground/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
         </div>
 
-        <div className={`flex-1 rounded-2xl p-5 border shadow-sm transition-all ${
+        <div className={`flex-1 rounded-2xl p-5 border shadow-sm transition-all relative ${
           sub.simulatedPct < sub.minAttendanceRequired
             ? "bg-red-50 dark:bg-red-950/20 shadow-red-500/10 border-red-200 dark:border-red-900/50"
             : action === "attend" && sub.simulatedPct >= sub.minAttendanceRequired 
@@ -292,6 +297,12 @@ function SubjectSimCard({ sub, action, count }: { sub: SubjectSimulationResult; 
           }`}>
             {sub.simulatedPct}%
           </p>
+          
+          {isPhysicallyImpossible && (
+            <div className="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-lg animate-bounce">
+              OUT OF BOUNDS
+            </div>
+          )}
         </div>
       </div>
 
@@ -301,42 +312,43 @@ function SubjectSimCard({ sub, action, count }: { sub: SubjectSimulationResult; 
         {sub.simulatedPct < sub.minAttendanceRequired ? (
              <div className="flex-1">
                <p className="text-sm font-black text-red-700 dark:text-red-400 mb-1 flex items-center gap-2">
-                 <span>🚨</span> Remediation Required
+                 <span>🚨</span> Action Required
                </p>
                {sub.isMathematicallyUnrecoverable ? (
                  <p className="text-sm font-bold text-red-600 leading-tight">
                    Mathematically impossible. Even if you attend all future classes, your max cap is strictly {sub.maxPossiblePct}% (&lt; {sub.minAttendanceRequired}%).
                  </p>
-               ) : sub.isRecoveryPossible ? (
-                 <p className="text-sm text-foreground font-medium leading-tight">
-                   To survive, you will need to actively attend the <strong className="text-amber-600 font-bold bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">next {sub.classesNeededToRecover} class{sub.classesNeededToRecover > 1 ? 'es' : ''}</strong> without fail.
-                 </p>
                ) : (
-                 <p className="text-sm font-bold text-red-600 leading-tight">
-                   Cannot recover. Only {Math.max(0, sub.remainingClasses - (action === 'skip' ? count : 0))} classes left, but you need {sub.classesNeededToRecover}.
+                 <p className="text-sm text-foreground font-medium leading-tight">
+                   To recover, you must attend the <strong className="text-amber-600 font-bold bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">next {sub.classesNeededToRecover} class{sub.classesNeededToRecover > 1 ? 'es' : ''}</strong> without fail.
                  </p>
                )}
              </div>
         ) : (
              <div className="flex-1 pl-1">
-               <p className="text-sm font-black text-foreground mb-1 flex items-center gap-2">
-                 <span>🛡️</span> Security Verified
+               <p className={`text-sm font-black mb-1 flex items-center gap-2 ${sub.alreadyBelowThreshold ? "text-blue-700" : "text-foreground"}`}>
+                 <span>{sub.alreadyBelowThreshold ? "🛡️ Recovery Pathway" : "🛡️ Status: Stable"}</span>
                </p>
                <p className="text-sm text-muted-foreground font-medium">
-                 Your attendance is resilient against this change. No immediate threat.
+                 {sub.alreadyBelowThreshold 
+                  ? "This action successfully brings you back into the eligibility zone."
+                  : "Your attendance is resilient. You have enough buffer to absorb this action."}
                </p>
              </div>
         )}
 
         {/* Hard Limits */}
         <div className="sm:text-right shrink-0 pt-4 sm:pt-0 border-t sm:border-t-0 border-border">
-          <p className="text-xs text-muted-foreground font-bold tracking-widest uppercase mb-1.5 flex items-center justify-start sm:justify-end gap-1.5 cursor-help" title="Highest attendance technically achievable this semester.">
-            Max Potential Cap
-            <svg className="w-4 h-4 text-muted-foreground/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </p>
+          <div className="flex items-center justify-start sm:justify-end gap-1.5 mb-1.5 ">
+            <p className="text-xs text-muted-foreground font-bold tracking-widest uppercase">Max Possible</p>
+            <div className="w-4 h-4 rounded-full bg-muted border flex items-center justify-center text-[10px] text-muted-foreground font-bold cursor-help" title="Highest attendance technically achievable this semester.">?</div>
+          </div>
           <div className={`inline-flex items-center justify-center px-4 py-2 rounded-xl border ${sub.maxPossiblePct < sub.minAttendanceRequired ? 'bg-red-50 border-red-200 text-red-700 font-black' : 'bg-background border-border text-foreground font-bold'}`}>
             <span className="text-lg">{sub.maxPossiblePct}%</span>
           </div>
+          <p className="text-[10px] text-muted-foreground font-bold mt-1 text-right">
+             {sub.remainingClasses} Classes Remaining
+          </p>
         </div>
       </div>
     </div>

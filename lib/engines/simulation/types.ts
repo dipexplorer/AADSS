@@ -35,6 +35,7 @@ export interface SubjectSimulationResult {
   
   // Confidence & Buffer
   totalClasses: number;
+  remainingClasses: number;
   confidenceLevel: "Low" | "Medium" | "High";
   bufferPct: number; // distance from min requirement (can be negative)
 }
