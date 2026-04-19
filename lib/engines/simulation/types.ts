@@ -6,60 +6,43 @@ export interface SubjectSimInput {
   present: number;
   absent: number;
   cancelled: number;
-  totalClasses: number; // present + absent (not cancelled)
+  totalClasses: number; // present + absent
   remainingClasses: number; // estimated classes left in semester
   minAttendanceRequired: number; // e.g. 75
 }
 
-// Skip Planner
-export interface SkipPlannerResult {
-  subjectId: string;
-  currentPct: number;
-  afterSkipPct: number;
-  isSafe: boolean; // still above threshold after skip
-  wouldDropBelow: boolean; // crosses threshold
+export interface SimAction {
+  mode: "skip" | "attend";
+  count: number;
 }
 
-// Recovery Planner
-export interface RecoveryPlannerResult {
-  subjectId: string;
-  currentPct: number;
-  targetPct: number;
-  classesNeeded: number; // consecutive present needed
-  isPossible: boolean; // achievable in remaining classes
-  classesShortBy: number; // 0 if possible
-}
-
-// Streak Simulator
-export interface StreakSimulatorResult {
-  subjectId: string;
-  currentPct: number;
-  projectedPct: number; // after N more present
-  streakNeeded: number; // input N
-  willReachTarget: boolean;
-}
-
-// Worst Case
-export interface WorstCaseResult {
-  subjectId: string;
-  currentPct: number;
-  maxSkipsAllowed: number; // can skip this many and stay above threshold
-  alreadyBreach: boolean; // already below threshold
-}
-
-// Full simulation output per subject
 export interface SubjectSimulationResult {
   subjectId: string;
   name: string;
   currentPct: number;
-  skipPlanner: SkipPlannerResult;
-  recoveryPlanner: RecoveryPlannerResult;
-  streakSimulator: StreakSimulatorResult;
-  worstCase: WorstCaseResult;
+  simulatedPct: number;
+  maxPossiblePct: number;
+  minAttendanceRequired: number;
+  
+  isSafeAfterAction: boolean;
+  wouldDropBelowThreshold: boolean;
+  alreadyBelowThreshold: boolean;
+  
+  // Recovery
+  classesNeededToRecover: number;
+  isRecoveryPossible: boolean;
+  
+  // Confidence
+  totalClasses: number;
+}
+
+export interface SimulationSummary {
+  overallDecision: "Safe" | "Risky" | "Not Recommended";
+  subjectsAffected: number; // How many drop below threshold because of this action
+  action: SimAction;
 }
 
 export interface SimulationOutput {
+  summary: SimulationSummary;
   subjects: SubjectSimulationResult[];
-  streakN: number; // user's chosen N for streak sim
-  recoveryTargetPct: number; // user's chosen target %
 }
