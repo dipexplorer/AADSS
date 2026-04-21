@@ -345,7 +345,7 @@ export default function ClassSessionsClient({
 
       {/* ── TIMELINE ── */}
       <div className="relative">
-        <div className="absolute top-0 bottom-0 left-[21px] md:left-[39px] w-0.5 bg-border rounded-full" />
+        <div className="absolute top-0 bottom-0 left-[55px] md:left-[75px] w-0.5 bg-border rounded-full" />
 
         <div className="space-y-6">
           {filteredSessions.length === 0 ? (
@@ -374,15 +374,15 @@ export default function ClassSessionsClient({
               return (
                 <div key={s.id} className="relative flex items-start group">
                   {/* Timeline Node */}
-                  <div className="w-11 md:w-20 shrink-0 flex flex-col items-center pt-5">
-                    <div className="text-xs font-semibold text-foreground bg-background py-1 relative z-10 w-full text-center">
+                  <div className="w-14 md:w-20 shrink-0 flex flex-col items-end pt-5 pr-4 md:pr-6">
+                    <div className="text-[10px] md:text-xs font-bold text-muted-foreground tabular-nums">
                       {s.start_time?.slice(0, 5)}
                     </div>
                   </div>
 
                   {/* Dot */}
                   <div
-                    className={`absolute left-[17px] md:left-[35px] top-[26px] z-10 w-[10px] h-[10px] rounded-full ring-4 ring-background ${statusConf.dot} transition-colors duration-300`}
+                    className={`absolute left-[51px] md:left-[71px] top-[26px] z-10 w-[10px] h-[10px] rounded-full ring-4 ring-background ${statusConf.dot} transition-colors duration-300`}
                   />
 
                   {/* Card content */}
