@@ -29,13 +29,16 @@ interface Profile {
   } | null;
 }
 
+import { SubjectAnalytics } from "@/lib/engines/analytics/types";
+
 interface Props {
   profile: Profile;
   initialDate: string;
   isHoliday?: boolean;
+  subjects: SubjectAnalytics[];
 }
 
-export default function DailyAttendanceClient({ profile, initialDate, isHoliday }: Props) {
+export default function DailyAttendanceClient({ profile, initialDate, isHoliday, subjects }: Props) {
   const router = useRouter();
   const [date, setDate] = useState(initialDate);
   const [periods, setPeriods] = useState<ClassPeriod[]>([]);
@@ -173,12 +176,13 @@ export default function DailyAttendanceClient({ profile, initialDate, isHoliday 
              </p>
            </div>
         ) : (
-           <ScheduleTimeline
-             periods={periods}
-             loading={loading}
-             date={date}
-             onStatusChange={handleMarkPresent}
-           />
+            <ScheduleTimeline
+              periods={periods}
+              loading={loading}
+              date={date}
+              onStatusChange={handleMarkPresent}
+              subjects={subjects}
+            />
         )}
 
         {/* Daily Notes Editor */}

@@ -3,13 +3,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStudentProfile } from "@/lib/attendance/getStudentProfile";
 import { Suspense } from "react";
+import { getAnalyticsSummary } from "@/lib/engines/analytics/getAnalyticsSummary";
 import DailyAttendanceClient from "@/app/daily-attendance/components/DailyAttendanceClient";
 import Header from "@/components/common/Header";
 
 export default async function DailyAttendancePage({
   searchParams,
 }: {
-  searchParams: { date?: string, holiday?: string };
+  searchParams: Promise<{ date?: string, holiday?: string }>;
 }) {
   const supabase = createClient();
   const {
@@ -21,16 +22,29 @@ export default async function DailyAttendancePage({
   const { data: profile } = await getStudentProfile();
   if (!profile) redirect("/onboarding");
 
+  const resolvedParams = await searchParams;
   const today = new Date();
   const dateStr =
-    searchParams.date ??
+    resolvedParams.date ??
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  const sessionId = (profile.academic_sessions as any)?.id ?? "";
+  const { data: analytics } = await getAnalyticsSummary(
+    profile.semester_id,
+    profile.id,
+    sessionId
+  );
 
   return (
     <>
       <Header />
       <Suspense fallback={<DailyAttendanceSkeleton />}>
-        <DailyAttendanceClient profile={profile} initialDate={dateStr} isHoliday={searchParams.holiday === 'true'} />
+        <DailyAttendanceClient 
+          profile={profile} 
+          initialDate={dateStr} 
+          isHoliday={resolvedParams.holiday === 'true'} 
+          subjects={analytics?.subjects ?? []}
+        />
       </Suspense>
     </>
   );

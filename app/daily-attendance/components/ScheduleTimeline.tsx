@@ -4,6 +4,7 @@
 import { ClassPeriod } from "@/lib/attendance/getDailySchedule";
 import type { GeoLocation } from "@/lib/engines/validation/types";
 import { useState, useEffect } from "react";
+import { SubjectAnalytics } from "@/lib/engines/analytics/types";
 
 interface ScheduleTimelineProps {
   periods: ClassPeriod[];
@@ -13,6 +14,7 @@ interface ScheduleTimelineProps {
     sessionId: string,
     status: "present",
   ) => void;
+  subjects: SubjectAnalytics[];
 }
 
 const WINDOW_MINUTES = 10; // must match server-side window
@@ -64,6 +66,7 @@ export default function ScheduleTimeline({
   loading,
   date,
   onStatusChange,
+  subjects,
 }: ScheduleTimelineProps) {
   const [now, setNow] = useState(new Date());
 
@@ -144,6 +147,7 @@ export default function ScheduleTimeline({
           date={date}
           now={now}
           onMarkPresent={() => onStatusChange(period.sessionId, "present")}
+          subjects={subjects}
         />
       ))}
     </div>
@@ -156,12 +160,14 @@ function PeriodCard({
   date,
   now,
   onMarkPresent,
+  subjects,
 }: {
   period: ClassPeriod;
   periodNumber: number;
   date: string;
   now: Date;
   onMarkPresent: () => void;
+  subjects: SubjectAnalytics[];
 }) {
   const [locating, setLocating] = useState(false);
 
@@ -219,9 +225,30 @@ function PeriodCard({
 
         {/* Subject Info */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-lg text-foreground uppercase tracking-tight truncate">
-            {period.subjectName}
-          </h3>
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="font-bold text-lg text-foreground uppercase tracking-tight truncate">
+              {period.subjectName}
+            </h3>
+            {/* Tactical Hint Badge */}
+            {(() => {
+              const sub = subjects.find(s => s.subjectId === period.subjectId);
+              if (!sub) return null;
+              
+              const currentPct = sub.attendancePercentage;
+              const skipPct = (sub.presentClasses / (sub.totalClasses + 1)) * 100;
+              const isCritical = currentPct < 75 || skipPct < 75;
+
+              return isCritical ? (
+                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-700 border border-red-200 uppercase tracking-tighter">
+                  🚨 Critical
+                </span>
+              ) : (
+                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-green-100 text-green-700 border border-green-200 uppercase tracking-tighter">
+                  🛡️ Safe
+                </span>
+              );
+            })()}
+          </div>
           <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-muted-foreground mt-1">
             <span className="flex items-center gap-1">
               <svg className="w-3.5 h-3.5 text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
