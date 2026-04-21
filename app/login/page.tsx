@@ -40,7 +40,7 @@ export default function LoginPage() {
       if (res.needsOnboarding) {
         router.push("/onboarding");
       } else {
-        router.push("/calendar-dashboard");
+        router.push("/dashboard");
       }
     } catch (err) {
       toast.error(

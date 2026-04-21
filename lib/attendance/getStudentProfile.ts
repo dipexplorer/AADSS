@@ -21,6 +21,8 @@ export async function getStudentProfile() {
       session_id,
       program_id,
       semester_id,
+      full_name,
+      roll_number,
       academic_sessions (
         id,
         name,
