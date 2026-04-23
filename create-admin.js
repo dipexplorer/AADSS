@@ -72,3 +72,5 @@ async function createAdmin() {
 }
 
 createAdmin();
+
+// node create-admin.js [EMAIL_ADDRESS] [PASSWORD]
