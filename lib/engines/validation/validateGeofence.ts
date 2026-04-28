@@ -49,15 +49,14 @@ export function validateGeofence(
   classroomLon: number,
   allowedRadius: number, // meters
 ): ValidationResult {
-  // Agar GPS accuracy bahut kharab hai → soft pass
-  // (100m se zyada inaccurate GPS pe strict enforcement nahi)
-  if (studentLocation.accuracy > 100) {
-    console.warn(
-      `[Geofence] Poor GPS accuracy: ${studentLocation.accuracy}m — soft pass`,
-    );
-    return { valid: true };
+  // STRICT RULE 1: Deny spoofed or extremely poor GPS accuracy (No more Free Pass!)
+  if (studentLocation.accuracy > 80) {
+    // 80 meters is the strict cutoff
+    return {
+      valid: false,
+      error: "OUTSIDE_GEOFENCE",
+    };
   }
-
   const distance = haversineDistance(
     studentLocation.latitude,
     studentLocation.longitude,
@@ -65,13 +64,15 @@ export function validateGeofence(
     classroomLon,
   );
 
-  // Effective radius = allowed_radius + GPS accuracy buffer
-  const effectiveRadius = allowedRadius + studentLocation.accuracy;
-
+  // STRICT RULE 2: Buffer cap lagayenge.
+  // Max grace sirf student ki GPS accuracy tak (max 30-40 meter extra hi allowed).
+  const effectiveRadius =
+    allowedRadius + Math.min(studentLocation.accuracy, 40);
   if (distance > effectiveRadius) {
     return {
       valid: false,
       error: "OUTSIDE_GEOFENCE",
+      // Optional: Aap message frontend pe proper bhej sakte hain
     };
   }
 

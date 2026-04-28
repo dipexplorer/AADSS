@@ -30,26 +30,34 @@ export async function markAttendance(
   studentProfileId: string,
   status: "present",
   location?: GeoLocation,
-  deviceFingerprint?: string
+  deviceFingerprint?: string,
 ): Promise<MarkAttendanceResult> {
   const supabase = createClient();
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError || !user) {
-    return { error: "Authentication failed. Please log in again.", validationError: "AUTH_ERROR" };
+    return {
+      error: "Authentication failed. Please log in again.",
+      validationError: "AUTH_ERROR",
+    };
   }
 
   // ── Guard: Device Fingerprint Verification ────────────────────────
   // DEVICE_LOCK is only enforced when explicitly enabled via env variable.
   // During dev/testing, fingerprints may collide (same browser, multiple accounts).
-  const deviceLockEnabled = process.env.NEXT_PUBLIC_DEVICE_LOCK_ENABLED === "true";
+  const deviceLockEnabled =
+    process.env.NEXT_PUBLIC_DEVICE_LOCK_ENABLED === "true";
   if (
     deviceLockEnabled &&
     user.user_metadata?.device_id &&
     user.user_metadata.device_id !== deviceFingerprint
   ) {
     return {
-      error: "Proxy Detected: You must use your registered primary attendance device.",
+      error:
+        "Proxy Detected: You must use your registered primary attendance device.",
       validationError: "PROXY_DETECTED",
     };
   }
@@ -97,8 +105,7 @@ export async function markAttendance(
 
   if (session.status === "completed") {
     return {
-      error:
-        "This class has already ended. The attendance window is closed.",
+      error: "This class has already ended. The attendance window is closed.",
       validationError: "SESSION_COMPLETED",
     };
   }
@@ -147,12 +154,23 @@ export async function markAttendance(
     ? (rawTimetable[0] as Record<string, unknown> | undefined)
     : (rawTimetable as Record<string, unknown> | null);
 
-  const classLat = timetableRow?.latitude != null ? Number(timetableRow.latitude) : null;
-  const classLon = timetableRow?.longitude != null ? Number(timetableRow.longitude) : null;
-  const classRadius = timetableRow?.allowed_radius != null ? Number(timetableRow.allowed_radius) : null;
+  const classLat =
+    timetableRow?.latitude != null ? Number(timetableRow.latitude) : null;
+  const classLon =
+    timetableRow?.longitude != null ? Number(timetableRow.longitude) : null;
+  const classRadius =
+    timetableRow?.allowed_radius != null
+      ? Number(timetableRow.allowed_radius)
+      : null;
 
-  if (classLat !== null && classLon !== null && classRadius !== null &&
-      !isNaN(classLat) && !isNaN(classLon) && !isNaN(classRadius)) {
+  if (
+    classLat !== null &&
+    classLon !== null &&
+    classRadius !== null &&
+    !isNaN(classLat) &&
+    !isNaN(classLon) &&
+    !isNaN(classRadius)
+  ) {
     if (!location) {
       return {
         error: "Location required to mark attendance for this class.",
@@ -168,8 +186,15 @@ export async function markAttendance(
     );
 
     if (!geoCheck.valid) {
+      if (geoCheck.error === "OUTSIDE_GEOFENCE") {
+        return {
+          error:
+            "Your GPS accuracy is very weak. Please come inside the classroom premises.",
+          validationError: "OUTSIDE_GEOFENCE",
+        };
+      }
       return {
-        error: "You are not within the classroom premises.",
+        error: `You are too far from the classroom. Strictly inside allowed radius (${classRadius}m).`,
         validationError: geoCheck.error,
       };
     }

@@ -38,7 +38,12 @@ interface Props {
   subjects: SubjectAnalytics[];
 }
 
-export default function DailyAttendanceClient({ profile, initialDate, isHoliday, subjects }: Props) {
+export default function DailyAttendanceClient({
+  profile,
+  initialDate,
+  isHoliday,
+  subjects,
+}: Props) {
   const router = useRouter();
   const [date, setDate] = useState(initialDate);
   const [periods, setPeriods] = useState<ClassPeriod[]>([]);
@@ -80,74 +85,86 @@ export default function DailyAttendanceClient({ profile, initialDate, isHoliday,
     router.push(`/daily-attendance?date=${newDate}`, { scroll: false });
   }
 
-  /**
-   * Students can only mark themselves PRESENT.
-   * Absent and cancelled are handled by system/admin.
-   * Location is fetched here for geo-fence validation.
-   */
   function handleMarkPresent(sessionId: string, status: "present") {
-    // Optimistic update
-    setPeriods((prev) =>
-      prev.map((p) =>
-        p.sessionId === sessionId ? { ...p, attendanceStatus: "present" } : p,
-      ),
-    );
+    // 1. First get location BEFORE server transition
+    toast.loading("Acquiring GPS... Please wait", { id: "gps-toast" });
 
-    startTransition(async () => {
-      try {
-        // Attempt to fetch GPS location (best effort)
-        let userLocation: GeoLocation | undefined;
-        try {
-          userLocation = await new Promise<GeoLocation>((resolve, reject) => {
-            if (!navigator.geolocation) {
-              return reject(new Error("Geolocation not supported"));
-            }
-            navigator.geolocation.getCurrentPosition(
-              (pos) =>
-                resolve({
-                  latitude: pos.coords.latitude,
-                  longitude: pos.coords.longitude,
-                  accuracy: pos.coords.accuracy,
-                }),
-              (err) => reject(err),
-              { enableHighAccuracy: true, timeout: 10000 },
-            );
-          });
-        } catch {
-          // No location — server will decide if geo-fence is required
-        }
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser.", {
+        id: "gps-toast",
+      });
+      return; // Stop right here
+    }
 
-        // Get locked device fingerprint via FingerprintJS
-        const deviceFingerprint = await getDeviceFingerprint();
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        toast.success("Location acquired! Processing...", { id: "gps-toast" });
 
-        const result = await markAttendance(
-          sessionId,
-          profile.id,
-          "present",
-          userLocation,
-          deviceFingerprint,
-        );
-
-        if (result.error) {
-          toast.error(result.error);
-          // Revert optimistic update
-          setPeriods((prev) =>
-            prev.map((p) =>
-              p.sessionId === sessionId ? { ...p, attendanceStatus: null } : p,
-            ),
-          );
-        } else {
-          toast.success("Attendance marked — Present ✓");
-        }
-      } catch {
-        toast.error("Something went wrong");
+        // Update UI optimistically ONLY after location grabbed easily
         setPeriods((prev) =>
           prev.map((p) =>
-            p.sessionId === sessionId ? { ...p, attendanceStatus: null } : p,
+            p.sessionId === sessionId
+              ? { ...p, attendanceStatus: "present" }
+              : p,
           ),
         );
-      }
-    });
+
+        const userLocation: GeoLocation = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        };
+
+        startTransition(async () => {
+          try {
+            const deviceFingerprint = await getDeviceFingerprint();
+            const result = await markAttendance(
+              sessionId,
+              profile.id,
+              "present",
+              userLocation,
+              deviceFingerprint,
+            );
+
+            if (result.error) {
+              toast.error(result.error); // E.g., "GPS signal very weak" or "You are too far"
+              setPeriods((prev) =>
+                prev.map((p) =>
+                  p.sessionId === sessionId
+                    ? { ...p, attendanceStatus: null }
+                    : p,
+                ),
+              );
+            } else {
+              toast.success("Attendance strictly verified & marked Present ✓");
+            }
+          } catch {
+            toast.error("Something went wrong on the server.");
+            setPeriods((prev) =>
+              prev.map((p) =>
+                p.sessionId === sessionId
+                  ? { ...p, attendanceStatus: null }
+                  : p,
+              ),
+            );
+          }
+        });
+      },
+      (geoError) => {
+        // Here we handle cases like user denying location permissions
+        if (geoError.code === geoError.PERMISSION_DENIED) {
+          toast.error(
+            "Location Permission Denied! Attendance requires precise location.",
+            { id: "gps-toast" },
+          );
+        } else {
+          toast.error("Failed to acquire GPS. Please turn on location.", {
+            id: "gps-toast",
+          });
+        }
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }, // STRICT BROWSER TIMEOUT
+    );
   }
 
   const semesterStart = profile.academic_sessions?.start_date ?? "";
@@ -166,23 +183,26 @@ export default function DailyAttendanceClient({ profile, initialDate, isHoliday,
 
         {/* Holiday Banner / Schedule */}
         {isHoliday ? (
-           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-2xl p-8 text-center shadow-sm">
-             <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">🎉</span>
-             </div>
-             <h2 className="text-xl font-bold text-amber-800 dark:text-amber-500 mb-2">Global Academic Holiday</h2>
-             <p className="text-amber-700/80 dark:text-amber-600/80 text-sm max-w-md mx-auto">
-               This date is marked as an institute holiday. No classes are scheduled and attendance will not be counted.
-             </p>
-           </div>
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-2xl p-8 text-center shadow-sm">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">🎉</span>
+            </div>
+            <h2 className="text-xl font-bold text-amber-800 dark:text-amber-500 mb-2">
+              Global Academic Holiday
+            </h2>
+            <p className="text-amber-700/80 dark:text-amber-600/80 text-sm max-w-md mx-auto">
+              This date is marked as an institute holiday. No classes are
+              scheduled and attendance will not be counted.
+            </p>
+          </div>
         ) : (
-            <ScheduleTimeline
-              periods={periods}
-              loading={loading}
-              date={date}
-              onStatusChange={handleMarkPresent}
-              subjects={subjects}
-            />
+          <ScheduleTimeline
+            periods={periods}
+            loading={loading}
+            date={date}
+            onStatusChange={handleMarkPresent}
+            subjects={subjects}
+          />
         )}
 
         {/* Daily Notes Editor */}
