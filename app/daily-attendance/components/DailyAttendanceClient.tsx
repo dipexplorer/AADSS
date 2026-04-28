@@ -154,13 +154,14 @@ export default function DailyAttendanceClient({
         // Here we handle cases like user denying location permissions
         if (geoError.code === geoError.PERMISSION_DENIED) {
           toast.error(
-            "Location Permission Denied! Attendance requires precise location.",
-            { id: "gps-toast" },
+            "⚠️ Location Blocked! Please click the Lock icon (🔒) in your URL bar and ALLOW Location to mark attendance.",
+            { id: "gps-toast", duration: 6000 },
           );
         } else {
-          toast.error("Failed to acquire GPS. Please turn on location.", {
-            id: "gps-toast",
-          });
+          toast.error(
+            "⏱️ GPS Timeout! Please enable your device Location setting and stand near a window.",
+            { id: "gps-toast", duration: 5000 },
+          );
         }
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }, // STRICT BROWSER TIMEOUT
